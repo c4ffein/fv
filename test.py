@@ -1,11 +1,11 @@
 from os import mkdir, rmdir, remove, listdir
 from shutil import rmtree
 from unittest import TestCase, main as unittest_main, mock
-from json import loads
+from json import loads, dumps
 from pathlib import Path
 from hashlib import sha256
 
-from fv import sha256sum, encrypt_file, decrypt_file, acquire_lock, release_lock, store_file, retrieve_file
+from fv import sha256sum, encrypt_file, decrypt_file, get_index, acquire_lock, release_lock, store_file, retrieve_file
 
 TESTING_DIR = "fv_testing_dir_947f6128-4d75-40bb-a9ad-1a64342bd860"
 STORE_DIR = f"{TESTING_DIR}/store_dir"  # TODO?
@@ -49,6 +49,12 @@ class FVTest(TestCase):
             f.write("I am a goofy file")
         with self.assertRaises(Exception):
             encrypt_file(f"{TESTING_DIR}/test_mdr1.txt", "stoopid-password-\"")
+
+    def test_can_get_hex_index(self):
+        mkdir(f"{TESTING_DIR}/index")
+        with open(f"{TESTING_DIR}/index/00a200030004000a.json", "w") as f:
+            f.write(dumps({"I am": "an index"}))
+        self.assertEqual(get_index(f"{TESTING_DIR}"), (45598959112290314, {"I am": "an index"}))
 
     def test_cant_double_aquire(self):
         acquire_lock(TESTING_DIR)

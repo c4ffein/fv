@@ -9,10 +9,7 @@ TODOs and possible improvements:
 - capture stdin, stderr, stdout for encrypt and decrypt
 - make metadata a tree, split letter by letter for the X firsts, then a final dir for the rest, then use existing logic
 """
-# TODO :
-#- include passing in metadata
-#- pyproject + ruff, even tho useless for now
-#- the index or metadata is not just a file, but a list of file, never overwrite, +1, use last one
+# TODO : pyproject + ruff, even tho useless for now
 
 
 from subprocess import Popen, PIPE
@@ -69,8 +66,6 @@ def get_index(store_path):
     with open(f"{store_path}/index/{current_index_file_name}", "r") as f:
         current_index = loads(f.read())
     return int(current_index_file_name[:16], 16), current_index
-
-# TODO : TEST PREVIOUS WITH INDEX AT 0x2ab
 
 
 def update_index(store_path, next_index_version, next_index):
