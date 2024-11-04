@@ -1,6 +1,6 @@
 from hashlib import sha256
 from json import dumps, loads
-from os import listdir, remove
+from os import listdir
 from pathlib import Path
 from shutil import rmtree
 from unittest import TestCase, mock
@@ -49,7 +49,7 @@ class FVTest(TestCase):
         with Path(f"{TESTING_DIR}/test_mdr1.txt").open("w") as f:
             f.write("I am a goofy file")
         encrypt_file(f"{TESTING_DIR}/test_mdr1.txt", "stoopid-Password-0")
-        remove(f"{TESTING_DIR}/test_mdr1.txt")
+        Path(f"{TESTING_DIR}/test_mdr1.txt").unlink()
         decrypt_file(f"{TESTING_DIR}/test_mdr1.txt.gpg", "stoopid-Password-0")
         with Path(f"{TESTING_DIR}/test_mdr1.txt").open() as f:
             o = f.read()
