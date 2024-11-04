@@ -51,7 +51,7 @@ class FVTest(TestCase):
         encrypt_file(f"{TESTING_DIR}/test_mdr1.txt", "stoopid-Password-0")
         remove(f"{TESTING_DIR}/test_mdr1.txt")
         decrypt_file(f"{TESTING_DIR}/test_mdr1.txt.gpg", "stoopid-Password-0")
-        with open(f"{TESTING_DIR}/test_mdr1.txt") as f:
+        with Path(f"{TESTING_DIR}/test_mdr1.txt").open() as f:
             o = f.read()
         assert o == "I am a goofy file"
 
@@ -96,7 +96,7 @@ class FVTest(TestCase):
 
     def test_load_1_file(self):
         file_1_sum = self._load_a_file("file.txt", "I am a goofy file")
-        with open(f"{TESTING_DIR}/store/index/0000000000000001.json") as f:
+        with Path(f"{TESTING_DIR}/store/index/0000000000000001.json").open() as f:
             index = loads(f.read())
         self.assertEqual(type(index), dict)
         self.assertEqual([(len(k), len(v)) for k, v in index.items()], [(36, 4)])
@@ -111,7 +111,7 @@ class FVTest(TestCase):
     def test_load_2_files(self):
         file_1_sum = self._load_a_file("file_1.txt", "I am a first goofy file")
         file_2_sum = self._load_a_file("file_2.txt", "I am a second goofy file")
-        with open(f"{TESTING_DIR}/store/index/0000000000000002.json") as f:
+        with Path(f"{TESTING_DIR}/store/index/0000000000000002.json").open() as f:
             index = loads(f.read())
         self.assertEqual(type(index), dict)
         self.assertEqual(len(index), 2)
