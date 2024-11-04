@@ -19,7 +19,6 @@ from fv import (
 )
 
 TESTING_DIR = "fv_testing_dir_947f6128-4d75-40bb-a9ad-1a64342bd860"
-STORE_DIR = f"{TESTING_DIR}/store_dir"  # TODO?
 
 
 class FVTest(TestCase):
