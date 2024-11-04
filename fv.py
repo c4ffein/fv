@@ -18,7 +18,7 @@ from subprocess import Popen, PIPE
 from pathlib import Path
 from json import loads, dumps
 from os import listdir, remove
-from uuid import uuid4
+from uuid import uuid4, UUID
 from shutil import copy as copy_file, rmtree
 from hashlib import sha256 as sha256_hasher
 from secrets import choice
@@ -128,6 +128,7 @@ def store_file(store_path, file_path):
     encrypted_file_sha256 = sha256sum(f"{store_path}/wip/{u}.gpg")
     index[u] = [password, regular_file_sha256, encrypted_file_sha256, file_name]
     update_index(store_path, index_version + 1, index)
+    print(u)
 
 
 @locked
@@ -156,12 +157,19 @@ def main():
     try:
         with open(Path.home() / ".config" / "fv" / "init.json") as f:
             config = loads(f.read())
-        path = config["stores"]["default"]["path"]
+        store_path = config["stores"]["default"]["path"]
     except:
         usage(wrong_config=True)
         return -1
     if len(argv) == 2:  # Try guess
-        pass # TODO
+        try:
+            u, file_path = UUID(argv[1]), None
+        except ValueError:
+            u, file_path = None, argv[1]
+        if u is not None:
+            retrieve_file(store_path, str(u))
+        else:
+            store_file(store_path, file_path)
     elif len(argv) == 3:
         pass # TODO : i / o, path / uuid
     else:
