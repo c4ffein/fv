@@ -26,6 +26,10 @@ from sys import argv, stderr
 from uuid import UUID, uuid4
 
 
+class FVException(Exception):
+    pass
+
+
 def sha256sum(file_path):
     with open(file_path, "rb") as f:
         sha256_hash = sha256_hasher()
@@ -40,9 +44,9 @@ def generate_password():  # I should make something better
 
 def check_password(password):
     if type(password) != str:
-        raise Exception("Password must be a string")
+        raise FVException("Password must be a string")
     if any(not ("A" <= c <= "Z" or "a" <= c <= "z" or "0" <= c <= "9" or c == "-") for c in password):
-        raise Exception("Password must be a [[ [A-Z] [a-z] [0-9] \\- ]] string")
+        raise FVException("Password must be a [[ [A-Z] [a-z] [0-9] \\- ]] string")
 
 
 def encrypt_file(filepath, password):
@@ -54,7 +58,7 @@ def encrypt_file(filepath, password):
 def decrypt_file(filepath, password):
     check_password(password)
     if filepath[-4:] != ".gpg" or len(filepath) < 4:
-        raise Exception("filepath must end with .gpg")
+        raise FVException("filepath must end with .gpg")
     p = Popen(
         ["gpg", "--batch", "--yes", "--passphrase-fd", "0", "--output", filepath[:-4], "--decrypt", filepath],
         stdin=PIPE,
@@ -70,7 +74,7 @@ def get_index(store_path):
         return 0, {}
     if any(not s.endswith(".json") or len(s) != 21 for s in saved_indexes):
         print(saved_indexes)
-        raise Exception("Wrong index name detected")  # Maybe overkill but keeping this for now
+        raise FVException("Wrong index name detected")  # Maybe overkill but keeping this for now
     current_index_file_name = max(saved_indexes)
     with open(f"{store_path}/index/{current_index_file_name}") as f:
         current_index = loads(f.read())
@@ -89,7 +93,7 @@ def acquire_lock(store_path):
         with open(f"{store_path}/.lock", "x") as f:
             pass
     except FileExistsError:
-        raise Exception(
+        raise FVException(
             f"Failed to acquire lock. " f"If no instance of the tool is running, you may remove the {store_path}/.lock"
         )
 
@@ -104,7 +108,7 @@ def locked(func):
         acquire_lock(store_path)
         try:
             func(store_path, *args, **kwargs)
-        except Exception as exc:
+        except FVException as exc:
             release_lock(store_path)
             raise exc
         release_lock(store_path)
@@ -118,7 +122,7 @@ def store_file(store_path, file_path):
     u = str(uuid4())
     password = generate_password()
     if u in index:
-        raise Exception("Time to play the lottery I guess")
+        raise FVException("Time to play the lottery I guess")
     file_name = Path(file_path).parts[-1]  # Assumes Windows path on Windows and Unix path on Unix
     copy_file(file_path, f"{store_path}/wip/{u}")
     encrypt_file(f"{store_path}/wip/{u}", password)

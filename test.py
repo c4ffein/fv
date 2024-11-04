@@ -6,7 +6,17 @@ from shutil import rmtree
 from unittest import TestCase, mock
 from unittest import main as unittest_main
 
-from fv import acquire_lock, decrypt_file, encrypt_file, get_index, release_lock, retrieve_file, sha256sum, store_file
+from fv import (
+    FVException,
+    acquire_lock,
+    decrypt_file,
+    encrypt_file,
+    get_index,
+    release_lock,
+    retrieve_file,
+    sha256sum,
+    store_file,
+)
 
 TESTING_DIR = "fv_testing_dir_947f6128-4d75-40bb-a9ad-1a64342bd860"
 STORE_DIR = f"{TESTING_DIR}/store_dir"  # TODO?
@@ -48,7 +58,7 @@ class FVTest(TestCase):
     def test_try_encrypt_unacceptable_password(self):
         with open(f"{TESTING_DIR}/test_mdr1.txt", "w") as f:
             f.write("I am a goofy file")
-        with self.assertRaises(Exception):
+        with self.assertRaises(FVException):
             encrypt_file(f"{TESTING_DIR}/test_mdr1.txt", 'stoopid-password-"')
 
     def test_can_get_hex_index(self):
@@ -59,7 +69,7 @@ class FVTest(TestCase):
 
     def test_cant_double_aquire(self):
         acquire_lock(TESTING_DIR)
-        with self.assertRaises(Exception):
+        with self.assertRaises(FVException):
             acquire_lock(TESTING_DIR)
 
     def test_can_acquire_release_acquire_release(self):
@@ -70,12 +80,12 @@ class FVTest(TestCase):
 
     def test_cant_store_while_locked(self):
         acquire_lock(f"{TESTING_DIR}/store")
-        with self.assertRaises(Exception):
+        with self.assertRaises(FVException):
             store_file(f"{TESTING_DIR}/store", f"{TESTING_DIR}/file.txt", "pass")
 
     def test_cant_retrieve_while_locked(self):
         acquire_lock(f"{TESTING_DIR}/store")
-        with self.assertRaises(Exception):
+        with self.assertRaises(FVException):
             retrieve_file(f"{TESTING_DIR}/store", "42")
 
     def _load_a_file(self, file_name, file_content):
