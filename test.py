@@ -37,7 +37,7 @@ class FVTest(TestCase):
         self._clean_test_dir()
 
     def test_sha256(self):
-        with open(f"{TESTING_DIR}/test_mdr1.txt", "w") as f:
+        with Path(f"{TESTING_DIR}/test_mdr1.txt").open("w") as f:
             f.write("I am a goofy file")
         self.assertEqual(
             sha256sum(f"{TESTING_DIR}/test_mdr1.txt"),
@@ -46,7 +46,7 @@ class FVTest(TestCase):
 
     def test_encrypt_decrypt(self):
         """Quick and dirty because re-encrypting doesn't guarantee the same output, just encrypt and decrypt again"""
-        with open(f"{TESTING_DIR}/test_mdr1.txt", "w") as f:
+        with Path(f"{TESTING_DIR}/test_mdr1.txt").open("w") as f:
             f.write("I am a goofy file")
         encrypt_file(f"{TESTING_DIR}/test_mdr1.txt", "stoopid-Password-0")
         remove(f"{TESTING_DIR}/test_mdr1.txt")
@@ -56,14 +56,14 @@ class FVTest(TestCase):
         assert o == "I am a goofy file"
 
     def test_try_encrypt_unacceptable_password(self):
-        with open(f"{TESTING_DIR}/test_mdr1.txt", "w") as f:
+        with Path(f"{TESTING_DIR}/test_mdr1.txt").open("w") as f:
             f.write("I am a goofy file")
         with self.assertRaises(FVException):
             encrypt_file(f"{TESTING_DIR}/test_mdr1.txt", 'stoopid-password-"')
 
     def test_can_get_hex_index(self):
         Path(f"{TESTING_DIR}/index").mkdir()
-        with open(f"{TESTING_DIR}/index/00a200030004000a.json", "w") as f:
+        with Path(f"{TESTING_DIR}/index/00a200030004000a.json").open("w") as f:
             f.write(dumps({"I am": "an index"}))
         self.assertEqual(get_index(f"{TESTING_DIR}"), (45598959112290314, {"I am": "an index"}))
 
@@ -89,7 +89,7 @@ class FVTest(TestCase):
             retrieve_file(f"{TESTING_DIR}/store", "42")
 
     def _load_a_file(self, file_name, file_content):
-        with open(f"{TESTING_DIR}/{file_name}", "w") as f:
+        with Path(f"{TESTING_DIR}/{file_name}").open("w") as f:
             f.write(file_content)
         store_file(f"{TESTING_DIR}/store", f"{TESTING_DIR}/{file_name}")
         return sha256(file_content.encode("utf-8")).hexdigest()
