@@ -157,7 +157,7 @@ def usage(wrong_config=False, wrong_command=False, wrong_arg_len=False):
         "- fv o uuid              ==> recover an indexed file from /encrypted_files to /file using the uuid from i",
         "- fv [[path] OR [uuid]]  ==> retrieves if the argument is an uuid, else stores as path",
         "===============",
-        "You can store any file and record it's uuid in your knowledge base or any other external tool",
+        "You can store any file and record its uuid in your knowledge base or any other external tool",
         "You can version /indexes and securely share it between your local devices",
         "You can remote sync /encrypted_files to many remote unsecure servers as those are encrypted and hashed",
     ]
