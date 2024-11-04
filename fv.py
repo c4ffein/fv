@@ -13,17 +13,17 @@ TODOs and possible improvements:
 """
 # TODO : ruff
 
-
-from subprocess import Popen, PIPE
-from pathlib import Path
-from json import loads, dumps
-from os import listdir, remove
-from uuid import uuid4, UUID
-from shutil import copy as copy_file, rmtree
 from hashlib import sha256 as sha256_hasher
+from json import dumps, loads
+from os import listdir, remove
+from pathlib import Path
 from secrets import choice
+from shutil import copy as copy_file
+from shutil import rmtree
 from string import ascii_letters, digits
-from sys import stderr, argv
+from subprocess import PIPE, Popen
+from sys import argv, stderr
+from uuid import UUID, uuid4
 
 
 def sha256sum(file_path):
@@ -72,7 +72,7 @@ def get_index(store_path):
         print(saved_indexes)
         raise Exception("Wrong index name detected")  # Maybe overkill but keeping this for now
     current_index_file_name = max(saved_indexes)
-    with open(f"{store_path}/index/{current_index_file_name}", "r") as f:
+    with open(f"{store_path}/index/{current_index_file_name}") as f:
         current_index = loads(f.read())
     return int(current_index_file_name[:16], 16), current_index
 
@@ -90,8 +90,7 @@ def acquire_lock(store_path):
             pass
     except FileExistsError:
         raise Exception(
-            f"Failed to acquire lock. "
-            f"If no instance of the tool is running, you may remove the {store_path}/.lock"
+            f"Failed to acquire lock. " f"If no instance of the tool is running, you may remove the {store_path}/.lock"
         )
 
 
@@ -109,6 +108,7 @@ def locked(func):
             release_lock(store_path)
             raise exc
         release_lock(store_path)
+
     return wrapper
 
 
@@ -142,7 +142,7 @@ def retrieve_file(store_path, uuid):
     copy_file(f"{store_path}/wip/{uuid}", f"{store_path}/files/{uuid}")
 
 
-def usage(wrong_config=False, wrong_command=False, wrong_arg_len=False): # TODO : DEPENDING ON WRONG STUFF
+def usage(wrong_config=False, wrong_command=False, wrong_arg_len=False):  # TODO : DEPENDING ON WRONG STUFF
     print(
         # "4 dirs :\n- files\n- encrypted_files\n- index\n- wip"
         # fv i file - TODO
@@ -163,15 +163,23 @@ def main():
     except:
         return usage(wrong_config=True)
     if len(argv) == 2:  # Try guess
-        try: u, file_path = UUID(argv[1]), None
-        except ValueError: u, file_path = None, argv[1]
-        if u is not None: retrieve_file(store_path, str(u))
-        else: store_file(store_path, file_path)
+        try:
+            u, file_path = UUID(argv[1]), None
+        except ValueError:
+            u, file_path = None, argv[1]
+        if u is not None:
+            retrieve_file(store_path, str(u))
+        else:
+            store_file(store_path, file_path)
     elif len(argv) == 3:
-        if arg[1] == "o": retrieve_file(store_path, str(u))
-        elif arg[1] == "i": store_file(store_path, file_path)
-        else: return usage(wrong_command=True)
-    else: return usage(wrong_arg_len=True)
+        if arg[1] == "o":
+            retrieve_file(store_path, str(u))
+        elif arg[1] == "i":
+            store_file(store_path, file_path)
+        else:
+            return usage(wrong_command=True)
+    else:
+        return usage(wrong_arg_len=True)
 
 
 if __name__ == "__main__":
