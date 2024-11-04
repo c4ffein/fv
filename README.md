@@ -12,7 +12,7 @@ KISS Python e2e encrypted FileVault based on `gpg`
 fv - File Vault
 ===============
 ~/.config/fv/init.json => {"stores": {"default": {"path": "path-that-will-include-the-subdirs"}}}
-  - creates 4 subdirs :
+  - creates 4 subdirs:
     - files
     - encrypted_files
     - index
