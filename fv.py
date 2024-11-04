@@ -142,16 +142,18 @@ def retrieve_file(store_path, uuid):
     copy_file(f"{store_path}/wip/{uuid}", f"{store_path}/files/{uuid}")
 
 
-def usage(wrong_config=False): # TODO : DEPENDING ON WRONG STUFF
-        print(
-            # "4 dirs :\n- files\n- encrypted_files\n- index\n- wip"
-            # fv i file - TODO
-            #  - will store the filename as metadata - TODO
-            # fv o uuid [path] - if no path just put in unencrpyted - TODO
-            # TODO : fv [path] OR [uuid] - retrieve if uuid, else stores as path
-            """~/.config/fv/init.json => {"stores": {"default": {"path": "path-that-will-include-the-subdirs"}}}""",
-            file=stderr,
-        )
+def usage(wrong_config=False, wrong_command=False, wrong_arg_len=False): # TODO : DEPENDING ON WRONG STUFF
+    print(
+        # "4 dirs :\n- files\n- encrypted_files\n- index\n- wip"
+        # fv i file - TODO
+        #  - will store the filename as metadata - TODO
+        # fv o uuid [path] - if no path just put in unencrpyted - TODO
+        # TODO : fv [path] OR [uuid] - retrieve if uuid, else stores as path
+        """~/.config/fv/init.json => {"stores": {"default": {"path": "path-that-will-include-the-subdirs"}}}""",
+        file=stderr,
+    )
+    return -1
+
 
 def main():
     try:
@@ -159,22 +161,17 @@ def main():
             config = loads(f.read())
         store_path = config["stores"]["default"]["path"]
     except:
-        usage(wrong_config=True)
-        return -1
+        return usage(wrong_config=True)
     if len(argv) == 2:  # Try guess
-        try:
-            u, file_path = UUID(argv[1]), None
-        except ValueError:
-            u, file_path = None, argv[1]
-        if u is not None:
-            retrieve_file(store_path, str(u))
-        else:
-            store_file(store_path, file_path)
+        try: u, file_path = UUID(argv[1]), None
+        except ValueError: u, file_path = None, argv[1]
+        if u is not None: retrieve_file(store_path, str(u))
+        else: store_file(store_path, file_path)
     elif len(argv) == 3:
-        pass # TODO : i / o, path / uuid
-    else:
-        usage()
-        return -2
+        if arg[1] == "o": retrieve_file(store_path, str(u))
+        elif arg[1] == "i": store_file(store_path, file_path)
+        else: return usage(wrong_command=True)
+    else: return usage(wrong_arg_len=True)
 
 
 if __name__ == "__main__":
