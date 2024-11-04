@@ -11,7 +11,6 @@ TODOs and possible improvements:
 - capture stdin, stderr, stdout for encrypt and decrypt
 - make metadata a tree, split letter by letter for the X firsts, then a final dir for the rest, then use existing logic
 """
-# TODO : ruff
 
 from hashlib import sha256 as sha256_hasher
 from json import dumps, loads
@@ -22,7 +21,7 @@ from shutil import copy as copy_file
 from shutil import rmtree
 from string import ascii_letters, digits
 from subprocess import PIPE, Popen
-from sys import argv, stderr
+from sys import argv
 from uuid import UUID, uuid4
 
 
@@ -146,16 +145,25 @@ def retrieve_file(store_path, uuid):
     copy_file(f"{store_path}/wip/{uuid}", f"{store_path}/files/{uuid}")
 
 
-def usage(wrong_config=False, wrong_command=False, wrong_arg_len=False):  # TODO : DEPENDING ON WRONG STUFF
-    print(
-        # "4 dirs :\n- files\n- encrypted_files\n- index\n- wip"
-        # fv i file - TODO
-        #  - will store the filename as metadata - TODO
-        # fv o uuid [path] - if no path just put in unencrpyted - TODO
-        # TODO : fv [path] OR [uuid] - retrieve if uuid, else stores as path
-        """~/.config/fv/init.json => {"stores": {"default": {"path": "path-that-will-include-the-subdirs"}}}""",
-        file=stderr,
-    )
+def usage(wrong_config=False, wrong_command=False, wrong_arg_len=False):
+    conf = """~/.config/fv/init.json => {"stores": {"default": {"path": "path-that-will-include-the-subdirs"}}}"""
+    output_lines = [
+        "fv - File Vault",
+        "===============",
+        conf,
+        "  - creates 4 subdirs :\n    - files\n    - encrypted_files\n    - index\n    - wip",
+        "===============",
+        "- fv i file_path         ==> encrypt with a single-use password, index, and store a file in /encrypted_files",
+        "- fv o uuid              ==> recover an indexed file from /encrypted_files to /file using the uuid from i",
+        "- fv [[path] OR [uuid]]  ==> retrieves if the argument is an uuid, else stores as path",
+        "===============",
+        "You can store any file and record it's uuid in your knowledge base or any other external tool",
+        "You can version /indexes and securely share it between your local devices",
+        "You can remote sync /encrypted_files to many remote unsecure servers as those are encrypted and hashed",
+    ]
+    red_indexes = ([2] if wrong_config else []) + ([5, 6, 7] if wrong_command or wrong_arg_len else [])
+    output_lines = [f"\033[93m{line}\033[0m" if i in red_indexes else line for i, line in enumerate(output_lines)]
+    print("\n" + "\n".join(output_lines) + "\n")
     return -1
 
 
@@ -177,9 +185,9 @@ def main():
             store_file(store_path, file_path)
     elif len(argv) == 3:
         if argv[1] == "o":
-            retrieve_file(store_path, str(u))
+            retrieve_file(store_path, str(UUID(argv[2])))
         elif argv[1] == "i":
-            store_file(store_path, file_path)
+            store_file(store_path, argv[2])
         else:
             return usage(wrong_command=True)
     else:
