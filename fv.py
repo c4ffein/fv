@@ -35,7 +35,7 @@ def sha256sum(file_path):
 
 
 def generate_password():  # I should make something better
-    return "".join(choice(ascii_letters + digits) for i in range(32))
+    return "".join(choice(ascii_letters + digits) for i in range(32))  # TODO : Better actually, ngl
 
 
 def check_password(password):
