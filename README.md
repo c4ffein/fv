@@ -8,8 +8,7 @@ KISS Python e2e encrypted FileVault based on `gpg`
   - Ngl they should rename it tho
 
 ## Help
-
-"""
+```
 fv - File Vault
 ===============
 ~/.config/fv/init.json => {"stores": {"default": {"path": "path-that-will-include-the-subdirs"}}}
@@ -26,4 +25,4 @@ fv - File Vault
 You can store any file and record it's uuid in your knowledge base or any other external tool
 You can version /indexes and securely share it between your local devices
 You can remote sync /encrypted_files to many remote unsecure servers as those are encrypted and hashed
-"""
+```
