@@ -75,62 +75,64 @@ class FVTest(TestCase):
     def test_cant_retrieve_while_locked(self):
         acquire_lock(f"{TESTING_DIR}/store")
         with self.assertRaises(Exception):
-            retrieve_file(f"{TESTING_DIR}/store", "42", "pass")
+            retrieve_file(f"{TESTING_DIR}/store", "42")
     
-    def _load_a_file(self, file_name, file_content, password):
+    def _load_a_file(self, file_name, file_content):
         with open(f"{TESTING_DIR}/{file_name}", "w") as f:
             f.write(file_content)
-        store_file(f"{TESTING_DIR}/store", f"{TESTING_DIR}/{file_name}", password)
+        store_file(f"{TESTING_DIR}/store", f"{TESTING_DIR}/{file_name}")
         return sha256(file_content.encode("utf-8")).hexdigest()
 
     def test_load_1_file(self):
-        file_1_sum = self._load_a_file("file.txt", "I am a goofy file", "pass")
+        file_1_sum = self._load_a_file("file.txt", "I am a goofy file")
         with open(f"{TESTING_DIR}/store/index/0000000000000001.json", "r") as f:
             index = loads(f.read())
         self.assertEqual(type(index), dict)
-        self.assertEqual([(len(k), len(v)) for k, v in index.items()], [(36, 3)])
-        self.assertEqual(next(iter(index.items())), (mock.ANY, [file_1_sum, mock.ANY, "file.txt"]))
+        self.assertEqual([(len(k), len(v)) for k, v in index.items()], [(36, 4)])
+        self.assertEqual(next(iter(index.items())), (mock.ANY, [mock.ANY, file_1_sum, mock.ANY, "file.txt"]))
         index_1 = [*index.keys()][0]
         self.assertEqual(sha256sum(f"{TESTING_DIR}/store/files/{index_1}"), file_1_sum)
         assert all(s.endswith(".gpg") for s in listdir(Path(f"{TESTING_DIR}/store/encrypted_files")))
-        decrypt_file(f"{TESTING_DIR}/store/encrypted_files/{index_1}.gpg", "pass")
+        password = next(iter(index.values()))[0]
+        decrypt_file(f"{TESTING_DIR}/store/encrypted_files/{index_1}.gpg", password)
         self.assertEqual(sha256sum(f"{TESTING_DIR}/store/encrypted_files/{index_1}"), file_1_sum)
 
     def test_load_2_files(self):
-        file_1_sum = self._load_a_file("file_1.txt", "I am a first goofy file", "pass")
-        file_2_sum = self._load_a_file("file_2.txt", "I am a second goofy file", "pass")
+        file_1_sum = self._load_a_file("file_1.txt", "I am a first goofy file")
+        file_2_sum = self._load_a_file("file_2.txt", "I am a second goofy file")
         with open(f"{TESTING_DIR}/store/index/0000000000000002.json", "r") as f:
             index = loads(f.read())
         self.assertEqual(type(index), dict)
         self.assertEqual(len(index), 2)
-        self.assertEqual([(len(k), len(v)) for k, v in index.items()], [(36, 3), (36, 3)])
+        self.assertEqual([(len(k), len(v)) for k, v in index.items()], [(36, 4), (36, 4)])
         values = [v for v in index.values()]
-        self.assertEqual((values[0][0], values[0][2]), (file_1_sum, "file_1.txt"))
-        self.assertEqual((values[1][0], values[1][2]), (file_2_sum, "file_2.txt"))
+        self.assertEqual((values[0][1], values[0][3]), (file_1_sum, "file_1.txt"))
+        self.assertEqual((values[1][1], values[1][3]), (file_2_sum, "file_2.txt"))
         index_1, index_2 = index.keys()
         self.assertEqual(sha256sum(f"{TESTING_DIR}/store/files/{index_1}"), file_1_sum)
         self.assertEqual(sha256sum(f"{TESTING_DIR}/store/files/{index_2}"), file_2_sum)
         assert all(s.endswith(".gpg") for s in listdir(Path(f"{TESTING_DIR}/store/encrypted_files")))
-        decrypt_file(f"{TESTING_DIR}/store/encrypted_files/{index_1}.gpg", "pass")
-        decrypt_file(f"{TESTING_DIR}/store/encrypted_files/{index_2}.gpg", "pass")
+        password_1, password_2 = (v[0] for v in index.values())
+        decrypt_file(f"{TESTING_DIR}/store/encrypted_files/{index_1}.gpg", password_1)
+        decrypt_file(f"{TESTING_DIR}/store/encrypted_files/{index_2}.gpg", password_2)
         self.assertEqual(sha256sum(f"{TESTING_DIR}/store/encrypted_files/{index_1}"), file_1_sum)
         self.assertEqual(sha256sum(f"{TESTING_DIR}/store/encrypted_files/{index_2}"), file_2_sum)
 
     def test_load_and_retrieve_a_cached_file(self):
-        file_1_sum = self._load_a_file("file.txt", "I am a goofy file", "pass")
+        file_1_sum = self._load_a_file("file.txt", "I am a goofy file")
         files = listdir(Path(f"{TESTING_DIR}/store/files"))
         self.assertEqual(len(files), 1)
-        retrieve_file(f"{TESTING_DIR}/store", files[0], "pass")
+        retrieve_file(f"{TESTING_DIR}/store", files[0])
         self.assertEqual(len(listdir(Path(f"{TESTING_DIR}/store/files"))), 1)
         self.assertEqual(sha256sum(f"{TESTING_DIR}/store/files/{files[0]}"), file_1_sum)
 
     def test_load_and_retrieve_2_cached_files(self):
-        file_1_sum = self._load_a_file("file_1.txt", "I am a first goofy file", "pass")
-        file_2_sum = self._load_a_file("file_2.txt", "I am a second goofy file", "pass")
+        file_1_sum = self._load_a_file("file_1.txt", "I am a first goofy file")
+        file_2_sum = self._load_a_file("file_2.txt", "I am a second goofy file")
         files = listdir(Path(f"{TESTING_DIR}/store/files"))
         self.assertEqual(len(files), 2)
-        retrieve_file(f"{TESTING_DIR}/store", files[0], "pass")
-        retrieve_file(f"{TESTING_DIR}/store", files[1], "pass")
+        retrieve_file(f"{TESTING_DIR}/store", files[0])
+        retrieve_file(f"{TESTING_DIR}/store", files[1])
         self.assertEqual(len(listdir(Path(f"{TESTING_DIR}/store/files"))), 2)
         the_set = {
             sha256sum(f"{TESTING_DIR}/store/files/{files[0]}"), sha256sum(f"{TESTING_DIR}/store/files/{files[1]}")
@@ -138,26 +140,26 @@ class FVTest(TestCase):
         self.assertEqual(the_set, {file_1_sum, file_2_sum})
     
     def test_load_and_retrieve_a_non_cached_file(self):
-        file_1_sum = self._load_a_file("file.txt", "I am a goofy file", "pass")
+        file_1_sum = self._load_a_file("file.txt", "I am a goofy file")
         files = listdir(Path(f"{TESTING_DIR}/store/files"))
         self.assertEqual(len(files), 1)
         rmtree(f"{TESTING_DIR}/store/files")
         mkdir(f"{TESTING_DIR}/store/files")
         self.assertEqual(len(listdir(Path(f"{TESTING_DIR}/store/files"))), 0)
-        retrieve_file(f"{TESTING_DIR}/store", files[0], "pass")
+        retrieve_file(f"{TESTING_DIR}/store", files[0])
         self.assertEqual(len(listdir(Path(f"{TESTING_DIR}/store/files"))), 1)
         self.assertEqual(sha256sum(f"{TESTING_DIR}/store/files/{files[0]}"), file_1_sum)
 
     def test_load_and_retrieve_2_non_cached_files(self):
-        file_1_sum = self._load_a_file("file_1.txt", "I am a first goofy file", "pass")
-        file_2_sum = self._load_a_file("file_2.txt", "I am a second goofy file", "pass")
+        file_1_sum = self._load_a_file("file_1.txt", "I am a first goofy file")
+        file_2_sum = self._load_a_file("file_2.txt", "I am a second goofy file")
         files = listdir(Path(f"{TESTING_DIR}/store/files"))
         self.assertEqual(len(files), 2)
         rmtree(f"{TESTING_DIR}/store/files")
         mkdir(f"{TESTING_DIR}/store/files")
         self.assertEqual(len(listdir(Path(f"{TESTING_DIR}/store/files"))), 0)
-        retrieve_file(f"{TESTING_DIR}/store", files[0], "pass")
-        retrieve_file(f"{TESTING_DIR}/store", files[1], "pass")
+        retrieve_file(f"{TESTING_DIR}/store", files[0])
+        retrieve_file(f"{TESTING_DIR}/store", files[1])
         self.assertEqual(len(listdir(Path(f"{TESTING_DIR}/store/files"))), 2)
         the_set = {
             sha256sum(f"{TESTING_DIR}/store/files/{files[0]}"), sha256sum(f"{TESTING_DIR}/store/files/{files[1]}")

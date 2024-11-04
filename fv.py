@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 """
 fv - File Vault
 MIT License - Copyright (c) 2024 c4ffein
@@ -19,14 +21,20 @@ from os import listdir, remove
 from uuid import uuid4
 from shutil import copy as copy_file, rmtree
 from hashlib import sha256 as sha256_hasher
+from secrets import choice
+from string import ascii_letters, digits
 
- 
+
 def sha256sum(file_path):
     with open(file_path, "rb") as f:
         sha256_hash = sha256_hasher()
         for block in iter(lambda: f.read(4096), b""):
             sha256_hash.update(block)
         return sha256_hash.hexdigest()
+
+
+def generate_password():  # I should make something better
+    return "".join(choice(ascii_letters + digits) for i in range(32))
 
 
 def check_password(password):
@@ -104,9 +112,10 @@ def locked(func):
 
 
 @locked
-def store_file(store_path, file_path, password):
+def store_file(store_path, file_path):
     index_version, index = get_index(store_path)
     u = str(uuid4())
+    password = generate_password()
     if u in index:
         raise Exception("Time to play the lottery I guess")
     file_name = Path(file_path).parts[-1]  # Assumes Windows path on Windows and Unix path on Unix
@@ -116,19 +125,26 @@ def store_file(store_path, file_path, password):
     copy_file(f"{store_path}/wip/{u}", f"{store_path}/files/{u}")
     regular_file_sha256 = sha256sum(f"{store_path}/wip/{u}")
     encrypted_file_sha256 = sha256sum(f"{store_path}/wip/{u}.gpg")
-    index[u] = [regular_file_sha256, encrypted_file_sha256, file_name]
+    index[u] = [password, regular_file_sha256, encrypted_file_sha256, file_name]
     update_index(store_path, index_version + 1, index)
 
 
 @locked
-def retrieve_file(store_path, uuid, password):
+def retrieve_file(store_path, uuid):
     if Path(f"{store_path}/files/{uuid}").is_file():
         return
+    _, index = get_index(store_path)
+    password = index[uuid][0]
     copy_file(f"{store_path}/encrypted_files/{uuid}.gpg", f"{store_path}/wip/{uuid}.gpg")
     decrypt_file(f"{store_path}/wip/{uuid}.gpg", password)
     copy_file(f"{store_path}/wip/{uuid}", f"{store_path}/files/{uuid}")
 
 
+def main():
+    with open(Path.home() / ".config" / "fv" / "init.json") as f:
+        config = loads(f.read())
+    print(config)
+# """{"stores": {"default": {"path": "path-that-will-include-the-subdirs"}}}"""
 # fv i file - TODO
 #  - will store the filename as metadata - TODO
 # fv o uuid [path] - if no path just put in unencrpyted - TODO
@@ -138,3 +154,7 @@ def retrieve_file(store_path, uuid, password):
 # - encrypted_files
 # - index
 # - wip
+
+
+if __name__ == "__main__":
+    main()
