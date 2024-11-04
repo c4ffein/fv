@@ -11,7 +11,7 @@ TODOs and possible improvements:
 - capture stdin, stderr, stdout for encrypt and decrypt
 - make metadata a tree, split letter by letter for the X firsts, then a final dir for the rest, then use existing logic
 """
-# TODO : pyproject + ruff, even tho useless for now
+# TODO : ruff
 
 
 from subprocess import Popen, PIPE
@@ -23,6 +23,7 @@ from shutil import copy as copy_file, rmtree
 from hashlib import sha256 as sha256_hasher
 from secrets import choice
 from string import ascii_letters, digits
+from sys import stderr, argv
 
 
 def sha256sum(file_path):
@@ -140,20 +141,32 @@ def retrieve_file(store_path, uuid):
     copy_file(f"{store_path}/wip/{uuid}", f"{store_path}/files/{uuid}")
 
 
-def main():
-    with open(Path.home() / ".config" / "fv" / "init.json") as f:
-        config = loads(f.read())
-    print(config)
-# """{"stores": {"default": {"path": "path-that-will-include-the-subdirs"}}}"""
-# fv i file - TODO
-#  - will store the filename as metadata - TODO
-# fv o uuid [path] - if no path just put in unencrpyted - TODO
+def usage(wrong_config=False): # TODO : DEPENDING ON WRONG STUFF
+        print(
+            # "4 dirs :\n- files\n- encrypted_files\n- index\n- wip"
+            # fv i file - TODO
+            #  - will store the filename as metadata - TODO
+            # fv o uuid [path] - if no path just put in unencrpyted - TODO
+            # TODO : fv [path] OR [uuid] - retrieve if uuid, else stores as path
+            """~/.config/fv/init.json => {"stores": {"default": {"path": "path-that-will-include-the-subdirs"}}}""",
+            file=stderr,
+        )
 
-# 4 dirs :
-# - files
-# - encrypted_files
-# - index
-# - wip
+def main():
+    try:
+        with open(Path.home() / ".config" / "fv" / "init.json") as f:
+            config = loads(f.read())
+        path = config["stores"]["default"]["path"]
+    except:
+        usage(wrong_config=True)
+        return -1
+    if len(argv) == 2:  # Try guess
+        pass # TODO
+    elif len(argv) == 3:
+        pass # TODO : i / o, path / uuid
+    else:
+        usage()
+        return -2
 
 
 if __name__ == "__main__":
