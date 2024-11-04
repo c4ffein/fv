@@ -151,7 +151,7 @@ def usage(wrong_config=False, wrong_command=False, wrong_arg_len=False):
         "fv - File Vault",
         "===============",
         conf,
-        "  - creates 4 subdirs :\n    - files\n    - encrypted_files\n    - index\n    - wip",
+        "  - creates 4 subdirs:\n    - files\n    - encrypted_files\n    - index\n    - wip",
         "===============",
         "- fv i file_path         ==> encrypt with a single-use password, index, and store a file in /encrypted_files",
         "- fv o uuid              ==> recover an indexed file from /encrypted_files to /file using the uuid from i",
