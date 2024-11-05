@@ -11,6 +11,7 @@ TODOs and possible improvements:
 - capture stdin, stderr, stdout for encrypt and decrypt
 - make metadata a tree, split letter by letter for the X firsts, then a final dir for the rest, then use existing logic
 - make it work with Windows paths, and edit README
+- add some random length random padding to files before encrypt, just also store actual length in index
 """
 
 from hashlib import sha256 as sha256_hasher
