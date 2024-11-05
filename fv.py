@@ -10,6 +10,7 @@ WARNING: I don't recommand using this as-is. This a PoC, and usable by me becaus
 TODOs and possible improvements:
 - capture stdin, stderr, stdout for encrypt and decrypt
 - make metadata a tree, split letter by letter for the X firsts, then a final dir for the rest, then use existing logic
+- make it work with Windows paths, and edit README
 """
 
 from hashlib import sha256 as sha256_hasher

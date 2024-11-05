@@ -6,6 +6,7 @@ KISS Python e2e encrypted FileVault based on `gpg`
 - You can use it if you feel that you can edit the code yourself and you can live with my future breaking changes.
 - If you want a production-ready e2e cloud with many features, check [github.com/Scille/parsec-cloud](https://github.com/Scille/parsec-cloud)
   - Ngl they should rename it tho
+- **Probably doesn't work for now with Windows paths**
 
 ## Help
 ```
