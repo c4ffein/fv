@@ -136,14 +136,14 @@ def store_file(store_path, file_path):
 
 @locked
 def retrieve_file(store_path, uuid):
+    _, index = get_index(store_path)
+    print(index[uuid][3], index[uuid][1])
     if Path(f"{store_path}/files/{uuid}").is_file():
         return
-    _, index = get_index(store_path)
     password = index[uuid][0]
     copy_file(f"{store_path}/encrypted_files/{uuid}.gpg", f"{store_path}/wip/{uuid}.gpg")
     decrypt_file(f"{store_path}/wip/{uuid}.gpg", password)
     copy_file(f"{store_path}/wip/{uuid}", f"{store_path}/files/{uuid}")
-    print(index[uuid][3], index[uuid][1])
 
 
 def usage(wrong_config=False, wrong_command=False, wrong_arg_len=False):
