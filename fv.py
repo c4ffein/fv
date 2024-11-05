@@ -137,7 +137,7 @@ def store_file(store_path, file_path):
 @locked
 def retrieve_file(store_path, uuid):
     _, index = get_index(store_path)
-    print(index[uuid][3], index[uuid][1])
+    print(index[uuid][1], index[uuid][3])
     if Path(f"{store_path}/files/{uuid}").is_file():
         return
     password = index[uuid][0]
