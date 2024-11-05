@@ -162,6 +162,7 @@ def usage(wrong_config=False, wrong_command=False, wrong_arg_len=False):
         "You can store any file and record its uuid in your knowledge base or any other external tool",
         "You can version /indexes and securely share it between your local devices",
         "You can remote sync /encrypted_files to many remote unsecure servers as those are encrypted and hashed",
+        "You can symlink /files for easy access to your files",
     ]
     red_indexes = ([2] if wrong_config else []) + ([5, 6, 7] if wrong_command or wrong_arg_len else [])
     output_lines = [f"\033[93m{line}\033[0m" if i in red_indexes else line for i, line in enumerate(output_lines)]

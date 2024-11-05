@@ -26,4 +26,5 @@ fv - File Vault
 You can store any file and record its uuid in your knowledge base or any other external tool
 You can version /indexes and securely share it between your local devices
 You can remote sync /encrypted_files to many remote unsecure servers as those are encrypted and hashed
+You can symlink /files for easy access to your files
 ```
