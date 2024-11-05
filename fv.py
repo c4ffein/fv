@@ -12,6 +12,7 @@ TODOs and possible improvements:
 - make metadata a tree, split letter by letter for the X firsts, then a final dir for the rest, then use existing logic
 - make it work with Windows paths, and edit README
 - add some random length random padding to files before encrypt, just also store actual length in index
+- maybe even add some random length padding before, and also include length of initial padding in index
 - option in the index to make fv automatically rm source on import, or even if and only if the i arg is used
 """
 
