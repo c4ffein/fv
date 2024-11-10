@@ -91,7 +91,8 @@ def update_index(store_path, next_index_version, next_index):
 
 def acquire_lock(store_path):
     for file_name in ["index", "files", "encrypted_files", "wip"]:
-        Path(f"{store_path}/{file_name}").mkdir(parents=True, exist_ok=True)
+        Path(f"{store_path}/{file_name}").mkdir(mode=0o700, parents=True, exist_ok=True)
+    Path(f"{store_path}").chmod(0o700)  # Warning : chmod doesn't set rights of parents
     try:
         with Path(f"{store_path}/.lock").open("x"):
             pass
