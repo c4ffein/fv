@@ -8,7 +8,6 @@ WARNING: I don't recommand using this as-is. This a PoC, and usable by me becaus
 - If you want a production-ready e2e cloud with many features, check https://github.com/Scille/parsec-cloud
   - Ngl they should rename it tho
 TODOs and possible improvements:
-- capture stdin, stderr, stdout for encrypt and decrypt
 - make metadata a tree, split letter by letter for the X firsts, then a final dir for the rest, then use existing logic
 - make it work with Windows paths, and edit README
 - add some random length random padding to files before encrypt, just also store actual length in index
@@ -54,8 +53,15 @@ def check_password(password):
 
 def encrypt_file(filepath, password):
     check_password(password)
-    p = Popen(["gpg", "--pinentry-mode", "loopback", "--passphrase", password, "-c", filepath])
-    p.wait()
+    p = Popen(
+        ["gpg", "--batch", "--yes", "--passphrase-fd", "0", "--symmetric", filepath],
+        stdin=PIPE,
+        stdout=PIPE,
+        stderr=PIPE,
+    )
+    stdout, stderr = p.communicate(bytes(password, encoding="ascii"))
+    if p.returncode != 0:
+        raise FVException(f"GPG encryption failed: {stderr.decode('utf-8', errors='replace')}")
 
 
 def decrypt_file(filepath, password):
@@ -65,9 +71,12 @@ def decrypt_file(filepath, password):
     p = Popen(
         ["gpg", "--batch", "--yes", "--passphrase-fd", "0", "--output", filepath[:-4], "--decrypt", filepath],
         stdin=PIPE,
+        stdout=PIPE,
+        stderr=PIPE,
     )
-    p.communicate(bytes(password, encoding="ascii"))
-    p.wait()
+    stdout, stderr = p.communicate(bytes(password, encoding="ascii"))
+    if p.returncode != 0:
+        raise FVException(f"GPG decryption failed: {stderr.decode('utf-8', errors='replace')}")
 
 
 def get_index(store_path):
@@ -155,14 +164,14 @@ def usage(wrong_config=False, wrong_command=False, wrong_arg_len=False):
     conf = """~/.config/fv/init.json => {"stores": {"default": {"path": "path-that-will-include-the-subdirs"}}}"""
     output_lines = [
         "fv - File Vault",
-        "===============",
+        "───────────────",
         conf,
         "  - creates 4 subdirs:\n    - files\n    - encrypted_files\n    - index\n    - wip",
-        "===============",
+        "───────────────",
         "- fv i file_path         ==> encrypt with a single-use password, index, and store a file in /encrypted_files",
         "- fv o uuid              ==> recover an indexed file from /encrypted_files to /file using the uuid from i",
         "- fv [[path] OR [uuid]]  ==> retrieves if the argument is an uuid, else stores as path",
-        "===============",
+        "───────────────",
         "You can store any file and record its uuid in your knowledge base or any other external tool",
         "You can version /indexes and securely share it between your local devices",
         "You can remote sync /encrypted_files to many remote unsecure servers as those are encrypted and hashed",
