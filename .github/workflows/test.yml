@@ -8,10 +8,11 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       max-parallel: 4
       matrix:
+        os: [ubuntu-latest, windows-latest]
         python-version: [3.12]
     timeout-minutes: 10
     steps:
@@ -25,9 +26,23 @@ jobs:
         python -m pip install --upgrade pip
         pip install uv
         uv venv venv
+    - name: Activate venv and install dependencies (Unix)
+      if: runner.os != 'Windows'
+      run: |
         . venv/bin/activate
         uv pip install .[dev]
-    - name: Run Tests
+    - name: Activate venv and install dependencies (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        venv\Scripts\activate
+        uv pip install .[dev]
+    - name: Run Tests (Unix)
+      if: runner.os != 'Windows'
       run: |
         . venv/bin/activate
         make test
+    - name: Run Tests (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        venv\Scripts\activate
+        python test.py
