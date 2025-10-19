@@ -9,7 +9,6 @@ WARNING: I don't recommand using this as-is. This a PoC, and usable by me becaus
   - Ngl they should rename it tho
 TODOs and possible improvements:
 - make metadata a tree, split letter by letter for the X firsts, then a final dir for the rest, then use existing logic
-- make it work with Windows paths, and edit README
 - add some random length random padding to files before encrypt, just also store actual length in index
 - maybe even add some random length padding before, and also include length of initial padding in index
 - option in the index to make fv automatically rm source on import, or even if and only if the i arg is used
@@ -26,6 +25,7 @@ from string import ascii_letters, digits
 from subprocess import PIPE, Popen
 from sys import argv
 from uuid import UUID, uuid4
+from warnings import warn
 
 
 class FVException(Exception):
@@ -105,6 +105,15 @@ def update_index(store_path, next_index_version, next_index):
 
 def acquire_lock(store_path):
     store_path = Path(store_path)
+    if os_name == "nt":  # Windows warning
+        warn(
+            "Windows does not support Unix-style file permissions (chmod/mode). "
+            "Directories are created with default Windows permissions, and aren't changed for existing ones. "
+            "Please ensure appropriate access controls are set using Windows ACLs "
+            "to restrict access to your user only.",
+            UserWarning,
+            stacklevel=2,
+        )
     for file_name in ["index", "files", "encrypted_files", "wip"]:
         subdir = store_path / file_name
         if os_name != "nt":  # Unix-like systems
