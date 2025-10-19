@@ -17,7 +17,7 @@ TODOs and possible improvements:
 
 from hashlib import sha256 as sha256_hasher
 from json import dumps, loads
-from os import listdir
+from os import listdir, name as os_name
 from pathlib import Path
 from secrets import choice
 from shutil import copy as copy_file
@@ -53,6 +53,7 @@ def check_password(password):
 
 def encrypt_file(filepath, password):
     check_password(password)
+    filepath = str(Path(filepath))  # Ensure string for subprocess
     p = Popen(
         ["gpg", "--batch", "--yes", "--passphrase-fd", "0", "--symmetric", filepath],
         stdin=PIPE,
@@ -66,10 +67,12 @@ def encrypt_file(filepath, password):
 
 def decrypt_file(filepath, password):
     check_password(password)
-    if filepath[-4:] != ".gpg" or len(filepath) < 4:
+    filepath = Path(filepath)
+    if filepath.suffix != ".gpg":
         raise FVException("filepath must end with .gpg")
+    output_path = filepath.with_suffix("")  # Remove .gpg extension
     p = Popen(
-        ["gpg", "--batch", "--yes", "--passphrase-fd", "0", "--output", filepath[:-4], "--decrypt", filepath],
+        ["gpg", "--batch", "--yes", "--passphrase-fd", "0", "--output", str(output_path), "--decrypt", str(filepath)],
         stdin=PIPE,
         stdout=PIPE,
         stderr=PIPE,
@@ -81,39 +84,48 @@ def decrypt_file(filepath, password):
 
 def get_index(store_path):
     """Returns current_index_version, current_index"""
-    saved_indexes = listdir(Path(f"{store_path}/index"))
+    store_path = Path(store_path)
+    saved_indexes = listdir(store_path / "index")
     if len(saved_indexes) == 0:
         return 0, {}
     if any(not s.endswith(".json") or len(s) != 21 for s in saved_indexes):
         print(saved_indexes)
         raise FVException("Wrong index name detected")  # Maybe overkill but keeping this for now
     current_index_file_name = max(saved_indexes)
-    with Path(f"{store_path}/index/{current_index_file_name}").open() as f:
+    with (store_path / "index" / current_index_file_name).open() as f:
         current_index = loads(f.read())
     return int(current_index_file_name[:16], 16), current_index
 
 
 def update_index(store_path, next_index_version, next_index):
-    with Path(f"{store_path}/index/{hex(next_index_version)[2:].zfill(16)}.json").open("w") as f:
+    store_path = Path(store_path)
+    with (store_path / "index" / f"{hex(next_index_version)[2:].zfill(16)}.json").open("w") as f:
         f.write(dumps(next_index))
 
 
 def acquire_lock(store_path):
+    store_path = Path(store_path)
     for file_name in ["index", "files", "encrypted_files", "wip"]:
-        Path(f"{store_path}/{file_name}").mkdir(mode=0o700, parents=True, exist_ok=True)
-    Path(f"{store_path}").chmod(0o700)  # Warning : chmod doesn't set rights of parents
+        subdir = store_path / file_name
+        if os_name != "nt":  # Unix-like systems
+            subdir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        else:  # Windows
+            subdir.mkdir(parents=True, exist_ok=True)
+    if os_name != "nt":  # Unix-like systems only
+        store_path.chmod(0o700)  # Warning : chmod doesn't set rights of parents
     try:
-        with Path(f"{store_path}/.lock").open("x"):
+        with (store_path / ".lock").open("x"):
             pass
     except FileExistsError:
         raise FVException(
-            f"Failed to acquire lock.\nIf no instance of the tool is running, you may remove the {store_path}/.lock"
+            f"Failed to acquire lock.\nIf no instance of the tool is running, you may remove the {store_path / '.lock'}"
         ) from None
 
 
 def release_lock(store_path):
-    rmtree(f"{store_path}/wip")
-    Path(f"{store_path}/.lock").unlink()
+    store_path = Path(store_path)
+    rmtree(store_path / "wip")
+    (store_path / ".lock").unlink()
 
 
 def locked(func):
@@ -131,18 +143,23 @@ def locked(func):
 
 @locked
 def store_file(store_path, file_path):
+    store_path = Path(store_path)
     index_version, index = get_index(store_path)
     u = str(uuid4())
     password = generate_password()
     if u in index:
         raise FVException("Time to play the lottery I guess")
-    file_name = Path(file_path).parts[-1]  # Assumes Windows path on Windows and Unix path on Unix
-    copy_file(file_path, f"{store_path}/wip/{u}")
-    encrypt_file(f"{store_path}/wip/{u}", password)
-    copy_file(f"{store_path}/wip/{u}.gpg", f"{store_path}/encrypted_files/{u}.gpg")
-    copy_file(f"{store_path}/wip/{u}", f"{store_path}/files/{u}")
-    regular_file_sha256 = sha256sum(f"{store_path}/wip/{u}")
-    encrypted_file_sha256 = sha256sum(f"{store_path}/wip/{u}.gpg")
+    file_name = Path(file_path).name  # Works cross-platform
+    wip_file = store_path / "wip" / u
+    wip_file_gpg = store_path / "wip" / f"{u}.gpg"
+    encrypted_file = store_path / "encrypted_files" / f"{u}.gpg"
+    stored_file = store_path / "files" / u
+    copy_file(file_path, wip_file)
+    encrypt_file(wip_file, password)
+    copy_file(wip_file_gpg, encrypted_file)
+    copy_file(wip_file, stored_file)
+    regular_file_sha256 = sha256sum(wip_file)
+    encrypted_file_sha256 = sha256sum(wip_file_gpg)
     index[u] = [password, regular_file_sha256, encrypted_file_sha256, file_name]
     update_index(store_path, index_version + 1, index)
     print(u)
@@ -150,14 +167,19 @@ def store_file(store_path, file_path):
 
 @locked
 def retrieve_file(store_path, uuid):
+    store_path = Path(store_path)
     _, index = get_index(store_path)
     print(index[uuid][1], index[uuid][3])
-    if Path(f"{store_path}/files/{uuid}").is_file():
+    stored_file = store_path / "files" / uuid
+    if stored_file.is_file():
         return
     password = index[uuid][0]
-    copy_file(f"{store_path}/encrypted_files/{uuid}.gpg", f"{store_path}/wip/{uuid}.gpg")
-    decrypt_file(f"{store_path}/wip/{uuid}.gpg", password)
-    copy_file(f"{store_path}/wip/{uuid}", f"{store_path}/files/{uuid}")
+    wip_file_gpg = store_path / "wip" / f"{uuid}.gpg"
+    wip_file = store_path / "wip" / uuid
+    encrypted_file = store_path / "encrypted_files" / f"{uuid}.gpg"
+    copy_file(encrypted_file, wip_file_gpg)
+    decrypt_file(wip_file_gpg, password)
+    copy_file(wip_file, stored_file)
 
 
 def usage(wrong_config=False, wrong_command=False, wrong_arg_len=False):
