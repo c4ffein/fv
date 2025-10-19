@@ -17,7 +17,7 @@ TODOs and possible improvements:
 
 from hashlib import sha256 as sha256_hasher
 from json import dumps, loads
-from os import listdir, name as os_name
+from os import name as os_name
 from pathlib import Path
 from secrets import choice
 from shutil import copy as copy_file
@@ -85,7 +85,7 @@ def decrypt_file(filepath, password):
 def get_index(store_path):
     """Returns current_index_version, current_index"""
     store_path = Path(store_path)
-    saved_indexes = listdir(store_path / "index")
+    saved_indexes = [p.name for p in (store_path / "index").iterdir()]
     if len(saved_indexes) == 0:
         return 0, {}
     if any(not s.endswith(".json") or len(s) != 21 for s in saved_indexes):
@@ -99,7 +99,7 @@ def get_index(store_path):
 
 def update_index(store_path, next_index_version, next_index):
     store_path = Path(store_path)
-    with (store_path / "index" / f"{hex(next_index_version)[2:].zfill(16)}.json").open("w") as f:
+    with (store_path / "index" / f"{next_index_version:016x}.json").open("w") as f:
         f.write(dumps(next_index))
 
 
