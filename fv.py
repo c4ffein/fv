@@ -6,14 +6,13 @@ MIT License - Copyright (c) 2024 c4ffein
 WARNING: I don't recommand using this as-is - this a PoC, usable by me because I know what I want to do with it
 - You can use it if you feel that you can edit the code yourself and you can live with my future breaking changes.
 - If you want a production-ready e2e cloud with many features, check https://github.com/Scille/parsec-cloud
-TODOs:
-- option in the index to make fv automatically rm source on import, or even if and only if the i arg is used
 Possible future improvements:
 - it is possible to actually have a tree of files separated by subparts of the uuid (probably 4 chars each)
   - this would circumvent the slow-down that a massive amount of files on the same level of a dir represent on some fs
   - doesn't pose problem for now on any of my machines, will implement dynamic sharding if this is the case
 """
 
+import sys
 from hashlib import sha256 as sha256_hasher
 from json import dumps, loads
 from os import name as os_name
@@ -23,7 +22,6 @@ from shutil import copy as copy_file
 from shutil import rmtree
 from string import ascii_letters, digits
 from subprocess import PIPE, Popen
-from sys import argv
 from uuid import UUID, uuid4
 from warnings import warn
 
@@ -151,20 +149,21 @@ def locked(func):
 
 
 @locked
-def store_file(store_path, file_path):
+def store_file(store_path, file_path, delete_source=False):
     store_path = Path(store_path)
+    file_path = Path(file_path)
     index_version, index = get_index(store_path)
     u = str(uuid4())
     password = generate_password()
     if u in index:
         raise FVException("Time to play the lottery I guess")
-    file_name = Path(file_path).name  # Works cross-platform
+    file_name = file_path.name  # Works cross-platform
     wip_file = store_path / "wip" / u
     wip_file_gpg = store_path / "wip" / f"{u}.gpg"
     encrypted_file = store_path / "encrypted_files" / f"{u}.gpg"
     stored_file = store_path / "files" / u
     # Read original file and calculate padding
-    with Path(file_path).open("rb") as f:
+    with file_path.open("rb") as f:
         original_content = f.read()
     real_size = len(original_content)
     # Calculate padding: file_size/16 to file_size/8 (6.25% - 12.5%)
@@ -192,6 +191,9 @@ def store_file(store_path, file_path):
     index[u] = [password, regular_file_sha256, encrypted_file_sha256, file_name, padding_before, real_size]
     update_index(store_path, index_version + 1, index)
     print(u)
+    # Only delete source after everything succeeded
+    if delete_source:
+        file_path.unlink()
 
 
 @locked
@@ -231,6 +233,7 @@ def usage(wrong_config=False, wrong_command=False, wrong_arg_len=False):
         "  - creates 4 subdirs:\n    - files\n    - encrypted_files\n    - index\n    - wip",
         "───────────────",
         "- fv i file_path         ==> encrypt with a single-use password, index, and store a file in /encrypted_files",
+        "- fv i --rm file_path    ==> same as above, but deletes the source file after successful storage",
         "- fv o uuid              ==> recover an indexed file from /encrypted_files to /file using the uuid from i",
         "- fv [[path] OR [uuid]]  ==> retrieves if the argument is an uuid, else stores as path",
         "───────────────",
@@ -239,7 +242,7 @@ def usage(wrong_config=False, wrong_command=False, wrong_arg_len=False):
         "You can remote sync /encrypted_files to many remote unsecure servers as those are encrypted and hashed",
         "You can symlink /files for easy access to your files",
     ]
-    red_indexes = ([2] if wrong_config else []) + ([5, 6, 7] if wrong_command or wrong_arg_len else [])
+    red_indexes = ([2] if wrong_config else []) + ([5, 6, 7, 8] if wrong_command or wrong_arg_len else [])
     output_lines = [f"\033[93m{line}\033[0m" if i in red_indexes else line for i, line in enumerate(output_lines)]
     print("\n" + "\n".join(output_lines) + "\n")
     return -1
@@ -252,20 +255,25 @@ def main():
         store_path = config["stores"]["default"]["path"]
     except Exception:
         return usage(wrong_config=True)
-    if len(argv) == 2:  # Try guess
+
+    # Check for --rm flag
+    delete_source = "--rm" in sys.argv
+    args = [arg for arg in sys.argv if arg != "--rm"]
+
+    if len(args) == 2:  # Try guess
         try:
-            u, file_path = UUID(argv[1]), None
+            u, file_path = UUID(args[1]), None
         except ValueError:
-            u, file_path = None, argv[1]
+            u, file_path = None, args[1]
         if u is not None:
             retrieve_file(store_path, str(u))
         else:
-            store_file(store_path, file_path)
-    elif len(argv) == 3:
-        if argv[1] == "o":
-            retrieve_file(store_path, str(UUID(argv[2])))
-        elif argv[1] == "i":
-            store_file(store_path, argv[2])
+            store_file(store_path, file_path, delete_source=delete_source)
+    elif len(args) == 3:
+        if args[1] == "o":
+            retrieve_file(store_path, str(UUID(args[2])))
+        elif args[1] == "i":
+            store_file(store_path, args[2], delete_source=delete_source)
         else:
             return usage(wrong_command=True)
     else:

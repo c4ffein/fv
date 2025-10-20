@@ -5,7 +5,6 @@ KISS Python e2e encrypted FileVault based on `gpg`
 **I don't recommand using this as-is.** This a PoC, usable by me because I know what I want to do with it.
 - You can use it if you feel that you can edit the code yourself and you can live with my future breaking changes.
 - If you want a production-ready e2e cloud with many features, check [github.com/Scille/parsec-cloud](https://github.com/Scille/parsec-cloud)
-  - Ngl they should rename it tho
 - **No auto ACL management for Windows paths**
 
 ## Help
@@ -20,6 +19,7 @@ fv - File Vault
     - wip
 ───────────────
 - fv i file_path         ==> encrypt with a single-use password, index, and store a file in /encrypted_files
+- fv i --rm file_path    ==> same as above, but deletes the source file after successful storage
 - fv o uuid              ==> recover an indexed file from /encrypted_files to /file using the uuid from i
 - fv [[path] OR [uuid]]  ==> retrieves if the argument is an uuid, else stores as path
 ───────────────

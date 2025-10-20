@@ -66,25 +66,19 @@ class PropertyTests(TestCase):
             test_file = Path(f"{TESTING_DIR}/input.bin")
             test_file.write_bytes(file_content)
             original_sha = sha256(file_content).hexdigest()
-
             # Store the file
             store_file(str(store_path), str(test_file))
-
             # Get the UUID from the index
             _, index = get_index(str(store_path))
             self.assertEqual(len(index), 1, "Should have exactly one file in index")
             uuid = list(index.keys())[0]
-
             # Verify index has correct sha256 of original
             self.assertEqual(index[uuid][1], original_sha, "Index should contain sha256 of original content")
-
             # Clear the cache to force decryption
             rmtree(store_path / "files")
             (store_path / "files").mkdir()
-
             # Retrieve the file
             retrieve_file(str(store_path), uuid)
-
             # Verify content matches original
             retrieved = (store_path / "files" / uuid).read_bytes()
             self.assertEqual(
@@ -93,7 +87,6 @@ class PropertyTests(TestCase):
                 f"Retrieved content should match original. "
                 f"Original: {len(file_content)} bytes, Retrieved: {len(retrieved)} bytes",
             )
-
             # Verify sha256 matches
             self.assertEqual(sha256sum(str(store_path / "files" / uuid)), original_sha)
 
@@ -108,22 +101,17 @@ class PropertyTests(TestCase):
             # Create file of exact size
             test_file = Path(f"{TESTING_DIR}/input.bin")
             test_file.write_bytes(b"x" * file_size)
-
             # Store the file
             store_file(str(store_path), str(test_file))
-
             # Get padding info from index
             _, index = get_index(str(store_path))
             uuid = list(index.keys())[0]
             padding_before = index[uuid][4]
             real_size = index[uuid][5]
-
             # Verify real_size matches original
             self.assertEqual(real_size, file_size, "real_size should match original file size")
-
             # Verify padding_before is non-negative
             self.assertGreaterEqual(padding_before, 0, "padding_before should be non-negative")
-
             # Verify padding_before is reasonable (should be 30-70% of total padding)
             # Total padding is file_size/16 to file_size/8
             max_total_padding = max(file_size // 8, 256)  # Account for tiny files too
@@ -136,13 +124,11 @@ class PropertyTests(TestCase):
         """
         for _ in range(1000):  # Test 1000 passwords
             password = generate_password()
-
             # Should not raise exception
             try:
                 check_password(password)
             except Exception as e:
                 self.fail(f"Generated password '{password}' failed validation: {e}")
-
             # Verify properties
             self.assertEqual(len(password), 32, "Password should be 32 characters")
             self.assertTrue(
@@ -161,15 +147,12 @@ class PropertyTests(TestCase):
             test_file.write_bytes(file_content)
             original_sha = sha256(file_content).hexdigest()
             original_size = len(file_content)
-
             # Store the file
             store_file(str(store_path), str(test_file))
-
             # Check index
             _, index = get_index(str(store_path))
             uuid = list(index.keys())[0]
             entry = index[uuid]
-
             # Verify index structure: [password, sha256, encrypted_sha256, filename, padding_before, real_size]
             self.assertEqual(len(entry), 6, "Index entry should have 6 fields")
             self.assertEqual(entry[1], original_sha, "SHA256 in index should match original")
@@ -188,13 +171,50 @@ class PropertyTests(TestCase):
         with clean_store() as store_path:
             test_file = Path(f"{TESTING_DIR}/edge_case.bin")
             test_file.write_bytes(file_content)
-
             # Store and immediately retrieve (no cache clearing)
             store_file(str(store_path), str(test_file))
-
             _, index = get_index(str(store_path))
             uuid = list(index.keys())[0]
-
             # File is cached, should be original
             cached = (store_path / "files" / uuid).read_bytes()
             self.assertEqual(cached, file_content, "Cached file should match original exactly")
+
+    @given(binary(min_size=0, max_size=100 * 1024))  # 0 to 100KB
+    @settings(max_examples=15, deadline=None)
+    def test_delete_source_removes_only_on_success(self, file_content):
+        """When delete_source=True, source should be deleted only after successful storage. Redundant but ok.
+
+        Property: For any file content, delete_source=True should:
+        1. Delete the source file after successful storage
+        2. Still allow correct retrieval
+        3. Preserve the original file's content in storage
+        """
+        with clean_store() as store_path:
+            # Create source file
+            source_file = Path(f"{TESTING_DIR}/to_be_deleted.bin")
+            source_file.write_bytes(file_content)
+            original_sha = sha256(file_content).hexdigest()
+            # Verify source exists before
+            self.assertTrue(source_file.exists(), "Source file should exist before storage")
+            # Store with delete_source=True
+            store_file(str(store_path), str(source_file), delete_source=True)
+            # Verify source is deleted
+            self.assertFalse(source_file.exists(), "Source file should be deleted after successful storage")
+            # Get UUID and verify storage
+            _, index = get_index(str(store_path))
+            uuid = list(index.keys())[0]
+            # Verify stored file has correct content
+            stored = (store_path / "files" / uuid).read_bytes()
+            self.assertEqual(stored, file_content, "Stored content should match original")
+            self.assertEqual(sha256sum(str(store_path / "files" / uuid)), original_sha, "SHA256 should match")
+            # Clear cache and retrieve from encrypted
+            rmtree(store_path / "files")
+            (store_path / "files").mkdir()
+            retrieve_file(str(store_path), uuid)
+            # Verify retrieved content matches original
+            retrieved = (store_path / "files" / uuid).read_bytes()
+            self.assertEqual(
+                retrieved,
+                file_content,
+                "Retrieved content should match original even after source was deleted",
+            )

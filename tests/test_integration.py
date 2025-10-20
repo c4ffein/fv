@@ -78,9 +78,11 @@ class FVTest(TestCase):
         release_lock(TESTING_DIR)
 
     def test_cant_store_while_locked(self):
+        with Path(f"{TESTING_DIR}/file.txt").open("w") as f:
+            f.write("test content")
         acquire_lock(f"{TESTING_DIR}/store")
         with self.assertRaises(FVException):
-            store_file(f"{TESTING_DIR}/store", f"{TESTING_DIR}/file.txt", "pass")
+            store_file(f"{TESTING_DIR}/store", f"{TESTING_DIR}/file.txt")
 
     def test_cant_retrieve_while_locked(self):
         acquire_lock(f"{TESTING_DIR}/store")
@@ -177,6 +179,220 @@ class FVTest(TestCase):
         self.assertIn("Show this help message", result.stdout)
         self.assertIn("lint", result.stdout)
         self.assertIn("test", result.stdout)
+
+    def test_store_without_rm_keeps_source(self):
+        """Verify that without delete_source=True, the source file is kept"""
+        source_file = Path(f"{TESTING_DIR}/source_file.txt")
+        with source_file.open("w") as f:
+            f.write("This file should remain after storage")
+        self.assertTrue(source_file.exists())
+        store_file(f"{TESTING_DIR}/store", str(source_file), delete_source=False)
+        # Source file should still exist
+        self.assertTrue(source_file.exists())
+        with source_file.open() as f:
+            self.assertEqual(f.read(), "This file should remain after storage")
+
+    def test_store_with_rm_deletes_source(self):
+        """Verify that with delete_source=True, the source file is deleted after successful storage"""
+        source_file = Path(f"{TESTING_DIR}/source_file.txt")
+        content = "This file should be deleted after storage"
+        with source_file.open("w") as f:
+            f.write(content)
+        self.assertTrue(source_file.exists())
+        store_file(f"{TESTING_DIR}/store", str(source_file), delete_source=True)
+        # Source file should be gone
+        self.assertFalse(source_file.exists())
+
+    def test_store_with_rm_still_stores_correctly(self):
+        """Verify that using delete_source=True doesn't affect the stored file integrity"""
+        source_file = Path(f"{TESTING_DIR}/source_file.txt")
+        content = "Content to be stored and source deleted"
+        with source_file.open("w") as f:
+            f.write(content)
+        original_hash = sha256(content.encode("utf-8")).hexdigest()
+        store_file(f"{TESTING_DIR}/store", str(source_file), delete_source=True)
+        # Source should be deleted
+        self.assertFalse(source_file.exists())
+        # But file should be stored correctly
+        files = [p.name for p in Path(f"{TESTING_DIR}/store/files").iterdir()]
+        self.assertEqual(len(files), 1)
+        stored_hash = sha256sum(f"{TESTING_DIR}/store/files/{files[0]}")
+        self.assertEqual(stored_hash, original_hash)
+
+    def test_store_with_rm_retrieves_correctly(self):
+        """Verify that a file stored with delete_source=True can be retrieved correctly"""
+        source_file = Path(f"{TESTING_DIR}/source_file.txt")
+        content = "Content that should be retrievable even after source deletion"
+        with source_file.open("w") as f:
+            f.write(content)
+        original_hash = sha256(content.encode("utf-8")).hexdigest()
+        store_file(f"{TESTING_DIR}/store", str(source_file), delete_source=True)
+        # Source should be deleted
+        self.assertFalse(source_file.exists())
+        # Get the UUID
+        files = [p.name for p in Path(f"{TESTING_DIR}/store/files").iterdir()]
+        uuid = files[0]
+        # Delete cached file to force retrieval from encrypted version
+        Path(f"{TESTING_DIR}/store/files/{uuid}").unlink()
+        # Retrieve the file
+        retrieve_file(f"{TESTING_DIR}/store", uuid)
+        # Verify retrieved file matches original
+        retrieved_hash = sha256sum(f"{TESTING_DIR}/store/files/{uuid}")
+        self.assertEqual(retrieved_hash, original_hash)
+        # Verify content
+        with Path(f"{TESTING_DIR}/store/files/{uuid}").open() as f:
+            self.assertEqual(f.read(), content)
+
+    def test_store_with_rm_on_lock_error_keeps_source(self):
+        """Verify that if storage fails (e.g., lock error), source file is NOT deleted"""
+        source_file = Path(f"{TESTING_DIR}/source_file.txt")
+        with source_file.open("w") as f:
+            f.write("This file should remain if storage fails")
+        # Acquire lock to force failure
+        acquire_lock(f"{TESTING_DIR}/store")
+        self.assertTrue(source_file.exists())
+        with self.assertRaises(FVException):
+            store_file(f"{TESTING_DIR}/store", str(source_file), delete_source=True)
+        # Source file should still exist because storage failed
+        self.assertTrue(source_file.exists())
+        with source_file.open() as f:
+            self.assertEqual(f.read(), "This file should remain if storage fails")
+
+    def test_cli_without_rm_flag_keeps_source(self):
+        """Test CLI: fv i file.txt (without --rm) should keep source file"""
+        from json import dumps
+
+        # Use absolute paths
+        test_dir_abs = Path(TESTING_DIR).resolve()
+        config_dir = test_dir_abs / ".config" / "fv"
+        config_dir.mkdir(parents=True)
+        store_path_abs = test_dir_abs / "store"
+        config = {"stores": {"default": {"path": str(store_path_abs)}}}
+        with (config_dir / "init.json").open("w") as f:
+            f.write(dumps(config))
+
+        # Create test file
+        source_file = test_dir_abs / "test_cli.txt"
+        with source_file.open("w") as f:
+            f.write("CLI test without --rm")
+
+        self.assertTrue(source_file.exists())
+
+        # Run CLI without --rm flag
+        import os
+        import sys
+
+        original_home = os.environ.get("HOME")
+        original_argv = sys.argv
+        try:
+            os.environ["HOME"] = str(test_dir_abs)
+            sys.argv = ["fv.py", "i", str(source_file)]
+
+            # Import and run main
+            from fv import main
+
+            main()
+
+            # Source file should still exist
+            self.assertTrue(source_file.exists(), "Source file should NOT be deleted without --rm flag")
+            with source_file.open() as f:
+                self.assertEqual(f.read(), "CLI test without --rm")
+        finally:
+            if original_home:
+                os.environ["HOME"] = original_home
+            else:
+                os.environ.pop("HOME", None)
+            sys.argv = original_argv
+
+    def test_cli_with_rm_flag_deletes_source(self):
+        """Test CLI: fv i --rm file.txt should delete source file"""
+        from json import dumps
+
+        # Use absolute paths
+        test_dir_abs = Path(TESTING_DIR).resolve()
+        config_dir = test_dir_abs / ".config" / "fv"
+        config_dir.mkdir(parents=True)
+        store_path_abs = test_dir_abs / "store"
+        config = {"stores": {"default": {"path": str(store_path_abs)}}}
+        with (config_dir / "init.json").open("w") as f:
+            f.write(dumps(config))
+
+        # Create test file
+        source_file = test_dir_abs / "test_cli_rm.txt"
+        with source_file.open("w") as f:
+            f.write("CLI test with --rm")
+
+        self.assertTrue(source_file.exists())
+
+        # Run CLI with --rm flag
+        import os
+        import sys
+
+        original_home = os.environ.get("HOME")
+        original_argv = sys.argv
+        try:
+            os.environ["HOME"] = str(test_dir_abs)
+            sys.argv = ["fv.py", "i", "--rm", str(source_file)]
+
+            # Import and run main
+            from fv import main
+
+            main()
+
+            # Source file should be deleted
+            self.assertFalse(source_file.exists(), "Source file should be deleted with --rm flag")
+        finally:
+            if original_home:
+                os.environ["HOME"] = original_home
+            else:
+                os.environ.pop("HOME", None)
+            sys.argv = original_argv
+
+    def test_cli_autodetect_without_rm_keeps_source(self):
+        """Test CLI: fv file.txt (autodetect mode without --rm) should keep source file"""
+        from json import dumps
+
+        # Use absolute paths
+        test_dir_abs = Path(TESTING_DIR).resolve()
+        config_dir = test_dir_abs / ".config" / "fv"
+        config_dir.mkdir(parents=True)
+        store_path_abs = test_dir_abs / "store"
+        config = {"stores": {"default": {"path": str(store_path_abs)}}}
+        with (config_dir / "init.json").open("w") as f:
+            f.write(dumps(config))
+
+        # Create test file
+        source_file = test_dir_abs / "test_autodetect.txt"
+        with source_file.open("w") as f:
+            f.write("Autodetect test without --rm")
+
+        self.assertTrue(source_file.exists())
+
+        # Run CLI in autodetect mode without --rm
+        import os
+        import sys
+
+        original_home = os.environ.get("HOME")
+        original_argv = sys.argv
+        try:
+            os.environ["HOME"] = str(test_dir_abs)
+            sys.argv = ["fv.py", str(source_file)]
+
+            # Import and run main
+            from fv import main
+
+            main()
+
+            # Source file should still exist
+            self.assertTrue(source_file.exists(), "Source file should NOT be deleted without --rm flag")
+            with source_file.open() as f:
+                self.assertEqual(f.read(), "Autodetect test without --rm")
+        finally:
+            if original_home:
+                os.environ["HOME"] = original_home
+            else:
+                os.environ.pop("HOME", None)
+            sys.argv = original_argv
 
 
 if __name__ == "__main__":
