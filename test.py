@@ -2,6 +2,7 @@ from hashlib import sha256
 from json import dumps, loads
 from pathlib import Path
 from shutil import rmtree
+from subprocess import run
 from unittest import TestCase, mock
 from unittest import main as unittest_main
 
@@ -170,6 +171,16 @@ class FVTest(TestCase):
         self.assertEqual(len(list(Path(f"{TESTING_DIR}/store/files").iterdir())), 2)
         the_set = {sha256sum(f"{TESTING_DIR}/store/files/{files[i]}") for i in (0, 1)}
         self.assertEqual(the_set, {file_1_sum, file_2_sum})
+
+    def test_make_help(self):
+        result = run(["make", "help"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, f"make help failed: {result.stderr}")
+        self.assertIn("Usage: make [target]", result.stdout)
+        self.assertIn("Available targets:", result.stdout)
+        self.assertIn("help", result.stdout)
+        self.assertIn("Show this help message", result.stdout)
+        self.assertIn("lint", result.stdout)
+        self.assertIn("test", result.stdout)
 
 
 if __name__ == "__main__":

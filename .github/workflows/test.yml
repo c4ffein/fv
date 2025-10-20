@@ -25,24 +25,24 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install uv
-        uv venv venv
+        uv venv
     - name: Activate venv and install dependencies (Unix)
       if: runner.os != 'Windows'
       run: |
-        . venv/bin/activate
+        . .venv/bin/activate
         uv pip install .[dev]
     - name: Activate venv and install dependencies (Windows)
       if: runner.os == 'Windows'
       run: |
-        venv\Scripts\activate
+        .venv\Scripts\activate
         uv pip install .[dev]
     - name: Run Tests (Unix)
       if: runner.os != 'Windows'
       run: |
-        . venv/bin/activate
+        . .venv/bin/activate
         make test
     - name: Run Tests (Windows)
       if: runner.os == 'Windows'
       run: |
-        venv\Scripts\activate
+        .venv\Scripts\activate
         python test.py
