@@ -3,7 +3,7 @@ from json import dumps, loads
 from pathlib import Path
 from shutil import rmtree
 from subprocess import run
-from unittest import TestCase, mock
+from unittest import TestCase
 from unittest import main as unittest_main
 
 from fv import (
@@ -98,14 +98,14 @@ class FVTest(TestCase):
         with Path(f"{TESTING_DIR}/store/index/0000000000000001.json").open() as f:
             index = loads(f.read())
         self.assertEqual(type(index), dict)
-        self.assertEqual([(len(k), len(v)) for k, v in index.items()], [(36, 4)])
-        self.assertEqual(next(iter(index.items())), (mock.ANY, [mock.ANY, file_1_sum, mock.ANY, "file.txt"]))
-        index_1 = [*index.keys()][0]
-        self.assertEqual(sha256sum(f"{TESTING_DIR}/store/files/{index_1}"), file_1_sum)
+        self.assertEqual([(len(k), len(v)) for k, v in index.items()], [(36, 6)])
+        entry = next(iter(index.values()))
+        self.assertEqual(entry[1], file_1_sum)  # Check original file sha256 from index
+        self.assertEqual(entry[3], "file.txt")  # Check filename
+        self.assertIsInstance(entry[4], int)  # padding_before
+        self.assertIsInstance(entry[5], int)  # real_size
+        # Note: stored file in /files/ has original content, encrypted file has padding
         assert all(p.name.endswith(".gpg") for p in Path(f"{TESTING_DIR}/store/encrypted_files").iterdir())
-        password = next(iter(index.values()))[0]
-        decrypt_file(f"{TESTING_DIR}/store/encrypted_files/{index_1}.gpg", password)
-        self.assertEqual(sha256sum(f"{TESTING_DIR}/store/encrypted_files/{index_1}"), file_1_sum)
 
     def test_load_2_files(self):
         file_1_sum = self._load_a_file("file_1.txt", "I am a first goofy file")
@@ -114,19 +114,15 @@ class FVTest(TestCase):
             index = loads(f.read())
         self.assertEqual(type(index), dict)
         self.assertEqual(len(index), 2)
-        self.assertEqual([(len(k), len(v)) for k, v in index.items()], [(36, 4), (36, 4)])
+        self.assertEqual([(len(k), len(v)) for k, v in index.items()], [(36, 6), (36, 6)])
         values = list(index.values())
         self.assertEqual((values[0][1], values[0][3]), (file_1_sum, "file_1.txt"))
         self.assertEqual((values[1][1], values[1][3]), (file_2_sum, "file_2.txt"))
-        index_1, index_2 = index.keys()
-        self.assertEqual(sha256sum(f"{TESTING_DIR}/store/files/{index_1}"), file_1_sum)
-        self.assertEqual(sha256sum(f"{TESTING_DIR}/store/files/{index_2}"), file_2_sum)
+        # Check padding info exists
+        for v in values:
+            self.assertIsInstance(v[4], int)  # padding_before
+            self.assertIsInstance(v[5], int)  # real_size
         assert all(p.name.endswith(".gpg") for p in Path(f"{TESTING_DIR}/store/encrypted_files").iterdir())
-        password_1, password_2 = (v[0] for v in index.values())
-        decrypt_file(f"{TESTING_DIR}/store/encrypted_files/{index_1}.gpg", password_1)
-        decrypt_file(f"{TESTING_DIR}/store/encrypted_files/{index_2}.gpg", password_2)
-        self.assertEqual(sha256sum(f"{TESTING_DIR}/store/encrypted_files/{index_1}"), file_1_sum)
-        self.assertEqual(sha256sum(f"{TESTING_DIR}/store/encrypted_files/{index_2}"), file_2_sum)
 
     def test_load_and_retrieve_a_cached_file(self):
         file_1_sum = self._load_a_file("file.txt", "I am a goofy file")

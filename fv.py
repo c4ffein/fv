@@ -20,7 +20,7 @@ from hashlib import sha256 as sha256_hasher
 from json import dumps, loads
 from os import name as os_name
 from pathlib import Path
-from secrets import choice
+from secrets import choice, randbelow, token_bytes
 from shutil import copy as copy_file
 from shutil import rmtree
 from string import ascii_letters, digits
@@ -165,13 +165,33 @@ def store_file(store_path, file_path):
     wip_file_gpg = store_path / "wip" / f"{u}.gpg"
     encrypted_file = store_path / "encrypted_files" / f"{u}.gpg"
     stored_file = store_path / "files" / u
-    copy_file(file_path, wip_file)
+    # Read original file and calculate padding
+    with Path(file_path).open("rb") as f:
+        original_content = f.read()
+    real_size = len(original_content)
+    # Calculate padding: file_size/16 to file_size/8 (6.25% - 12.5%)
+    padding_total = randbelow(real_size >> 4) + (real_size >> 4) if real_size > 0 else randbelow(128) + 128
+    # Split padding: 30-70% before, rest after
+    padding_before_ratio = randbelow(41) + 30  # 30-70%
+    padding_before = (padding_total * padding_before_ratio) // 100
+    padding_after = padding_total - padding_before
+    # Write padded content to wip file
+    with wip_file.open("wb") as f:
+        f.write(token_bytes(padding_before))
+        f.write(original_content)
+        f.write(token_bytes(padding_after))
+    # Calculate sha256 of original (unpadded) content
+    sha256_hash = sha256_hasher()
+    sha256_hash.update(original_content)
+    regular_file_sha256 = sha256_hash.hexdigest()
+    # Encrypt padded file
     encrypt_file(wip_file, password)
-    copy_file(wip_file_gpg, encrypted_file)
-    copy_file(wip_file, stored_file)
-    regular_file_sha256 = sha256sum(wip_file)
     encrypted_file_sha256 = sha256sum(wip_file_gpg)
-    index[u] = [password, regular_file_sha256, encrypted_file_sha256, file_name]
+    # Copy encrypted file (padded) and original file (unpadded) to their locations
+    copy_file(wip_file_gpg, encrypted_file)
+    copy_file(file_path, stored_file)  # Store original, not padded version
+    # Store in index: [password, original_sha256, encrypted_sha256, filename, padding_before, real_size]
+    index[u] = [password, regular_file_sha256, encrypted_file_sha256, file_name, padding_before, real_size]
     update_index(store_path, index_version + 1, index)
     print(u)
 
@@ -180,17 +200,28 @@ def store_file(store_path, file_path):
 def retrieve_file(store_path, uuid):
     store_path = Path(store_path)
     _, index = get_index(store_path)
-    print(index[uuid][1], index[uuid][3])
+    entry = index[uuid]
+    print(entry[1], entry[3])
     stored_file = store_path / "files" / uuid
     if stored_file.is_file():
         return
-    password = index[uuid][0]
+    password = entry[0]
     wip_file_gpg = store_path / "wip" / f"{uuid}.gpg"
     wip_file = store_path / "wip" / uuid
     encrypted_file = store_path / "encrypted_files" / f"{uuid}.gpg"
+    # Decrypt file
     copy_file(encrypted_file, wip_file_gpg)
     decrypt_file(wip_file_gpg, password)
-    copy_file(wip_file, stored_file)
+    # Strip padding: [password, sha256, enc_sha256, filename, padding_before, real_size]
+    padding_before = entry[4]
+    real_size = entry[5]
+    # Read padded file, strip padding, write original
+    with wip_file.open("rb") as f:
+        f.seek(padding_before)  # Skip padding_before bytes
+        original_content = f.read(real_size)  # Read only real_size bytes
+    # Write stripped content to stored_file
+    with stored_file.open("wb") as f:
+        f.write(original_content)
 
 
 def usage(wrong_config=False, wrong_command=False, wrong_arg_len=False):
