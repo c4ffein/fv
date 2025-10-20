@@ -283,8 +283,12 @@ class FVTest(TestCase):
         import sys
 
         original_home = os.environ.get("HOME")
+        original_gnupghome = os.environ.get("GNUPGHOME")
         original_argv = sys.argv
         try:
+            # Set GNUPGHOME to real user's gnupg dir so GPG agent works
+            if original_home:
+                os.environ["GNUPGHOME"] = str(Path(original_home) / ".gnupg")
             os.environ["HOME"] = str(test_dir_abs)
             sys.argv = ["fv.py", "i", str(source_file)]
 
@@ -302,6 +306,10 @@ class FVTest(TestCase):
                 os.environ["HOME"] = original_home
             else:
                 os.environ.pop("HOME", None)
+            if original_gnupghome:
+                os.environ["GNUPGHOME"] = original_gnupghome
+            else:
+                os.environ.pop("GNUPGHOME", None)
             sys.argv = original_argv
 
     def test_cli_with_rm_flag_deletes_source(self):
@@ -329,8 +337,12 @@ class FVTest(TestCase):
         import sys
 
         original_home = os.environ.get("HOME")
+        original_gnupghome = os.environ.get("GNUPGHOME")
         original_argv = sys.argv
         try:
+            # Set GNUPGHOME to real user's gnupg dir so GPG agent works
+            if original_home:
+                os.environ["GNUPGHOME"] = str(Path(original_home) / ".gnupg")
             os.environ["HOME"] = str(test_dir_abs)
             sys.argv = ["fv.py", "i", "--rm", str(source_file)]
 
@@ -346,6 +358,10 @@ class FVTest(TestCase):
                 os.environ["HOME"] = original_home
             else:
                 os.environ.pop("HOME", None)
+            if original_gnupghome:
+                os.environ["GNUPGHOME"] = original_gnupghome
+            else:
+                os.environ.pop("GNUPGHOME", None)
             sys.argv = original_argv
 
     def test_cli_autodetect_without_rm_keeps_source(self):
@@ -373,8 +389,12 @@ class FVTest(TestCase):
         import sys
 
         original_home = os.environ.get("HOME")
+        original_gnupghome = os.environ.get("GNUPGHOME")
         original_argv = sys.argv
         try:
+            # Set GNUPGHOME to real user's gnupg dir so GPG agent works
+            if original_home:
+                os.environ["GNUPGHOME"] = str(Path(original_home) / ".gnupg")
             os.environ["HOME"] = str(test_dir_abs)
             sys.argv = ["fv.py", str(source_file)]
 
@@ -392,6 +412,10 @@ class FVTest(TestCase):
                 os.environ["HOME"] = original_home
             else:
                 os.environ.pop("HOME", None)
+            if original_gnupghome:
+                os.environ["GNUPGHOME"] = original_gnupghome
+            else:
+                os.environ.pop("GNUPGHOME", None)
             sys.argv = original_argv
 
 
