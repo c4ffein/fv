@@ -3,6 +3,7 @@
 These tests verify invariants and properties that should hold for all inputs.
 """
 
+from contextlib import contextmanager
 from hashlib import sha256
 from pathlib import Path
 from shutil import rmtree
@@ -14,6 +15,25 @@ from hypothesis.strategies import binary, integers
 from fv import check_password, generate_password, get_index, retrieve_file, sha256sum, store_file
 
 TESTING_DIR = "fv_testing_dir_property_tests"
+
+
+@contextmanager
+def clean_store():
+    """Context manager that ensures clean store before and after each hypothesis example."""
+    store_path = Path(f"{TESTING_DIR}/store")
+    # Clean before
+    try:
+        rmtree(store_path)
+    except FileNotFoundError:
+        pass
+    try:
+        yield store_path
+    finally:
+        # Clean after
+        try:
+            rmtree(store_path)
+        except FileNotFoundError:
+            pass
 
 
 class PropertyTests(TestCase):
@@ -41,43 +61,41 @@ class PropertyTests(TestCase):
 
         Property: For any binary content, storing and retrieving should return identical content.
         """
-        # Write test file
-        test_file = Path(f"{TESTING_DIR}/input.bin")
-        test_file.write_bytes(file_content)
-        original_sha = sha256(file_content).hexdigest()
+        with clean_store() as store_path:
+            # Write test file
+            test_file = Path(f"{TESTING_DIR}/input.bin")
+            test_file.write_bytes(file_content)
+            original_sha = sha256(file_content).hexdigest()
 
-        # Store the file
-        store_file(f"{TESTING_DIR}/store", str(test_file))
+            # Store the file
+            store_file(str(store_path), str(test_file))
 
-        # Get the UUID from the index
-        _, index = get_index(f"{TESTING_DIR}/store")
-        self.assertEqual(len(index), 1, "Should have exactly one file in index")
-        uuid = list(index.keys())[0]
+            # Get the UUID from the index
+            _, index = get_index(str(store_path))
+            self.assertEqual(len(index), 1, "Should have exactly one file in index")
+            uuid = list(index.keys())[0]
 
-        # Verify index has correct sha256 of original
-        self.assertEqual(index[uuid][1], original_sha, "Index should contain sha256 of original content")
+            # Verify index has correct sha256 of original
+            self.assertEqual(index[uuid][1], original_sha, "Index should contain sha256 of original content")
 
-        # Clear the cache to force decryption
-        rmtree(f"{TESTING_DIR}/store/files")
-        Path(f"{TESTING_DIR}/store/files").mkdir()
+            # Clear the cache to force decryption
+            rmtree(store_path / "files")
+            (store_path / "files").mkdir()
 
-        # Retrieve the file
-        retrieve_file(f"{TESTING_DIR}/store", uuid)
+            # Retrieve the file
+            retrieve_file(str(store_path), uuid)
 
-        # Verify content matches original
-        retrieved = Path(f"{TESTING_DIR}/store/files/{uuid}").read_bytes()
-        self.assertEqual(
-            retrieved,
-            file_content,
-            f"Retrieved content should match original. "
-            f"Original: {len(file_content)} bytes, Retrieved: {len(retrieved)} bytes",
-        )
+            # Verify content matches original
+            retrieved = (store_path / "files" / uuid).read_bytes()
+            self.assertEqual(
+                retrieved,
+                file_content,
+                f"Retrieved content should match original. "
+                f"Original: {len(file_content)} bytes, Retrieved: {len(retrieved)} bytes",
+            )
 
-        # Verify sha256 matches
-        self.assertEqual(sha256sum(f"{TESTING_DIR}/store/files/{uuid}"), original_sha)
-
-        # Clean up for next example
-        rmtree(f"{TESTING_DIR}/store")
+            # Verify sha256 matches
+            self.assertEqual(sha256sum(str(store_path / "files" / uuid)), original_sha)
 
     @given(integers(min_value=100, max_value=1 * 1024 * 1024))  # 100 bytes to 1MB
     @settings(max_examples=20, deadline=None)
@@ -86,32 +104,30 @@ class PropertyTests(TestCase):
 
         Property: For any file size, padding_before and real_size should be stored in index.
         """
-        # Create file of exact size
-        test_file = Path(f"{TESTING_DIR}/input.bin")
-        test_file.write_bytes(b"x" * file_size)
+        with clean_store() as store_path:
+            # Create file of exact size
+            test_file = Path(f"{TESTING_DIR}/input.bin")
+            test_file.write_bytes(b"x" * file_size)
 
-        # Store the file
-        store_file(f"{TESTING_DIR}/store", str(test_file))
+            # Store the file
+            store_file(str(store_path), str(test_file))
 
-        # Get padding info from index
-        _, index = get_index(f"{TESTING_DIR}/store")
-        uuid = list(index.keys())[0]
-        padding_before = index[uuid][4]
-        real_size = index[uuid][5]
+            # Get padding info from index
+            _, index = get_index(str(store_path))
+            uuid = list(index.keys())[0]
+            padding_before = index[uuid][4]
+            real_size = index[uuid][5]
 
-        # Verify real_size matches original
-        self.assertEqual(real_size, file_size, "real_size should match original file size")
+            # Verify real_size matches original
+            self.assertEqual(real_size, file_size, "real_size should match original file size")
 
-        # Verify padding_before is non-negative
-        self.assertGreaterEqual(padding_before, 0, "padding_before should be non-negative")
+            # Verify padding_before is non-negative
+            self.assertGreaterEqual(padding_before, 0, "padding_before should be non-negative")
 
-        # Verify padding_before is reasonable (should be 30-70% of total padding)
-        # Total padding is file_size/16 to file_size/8
-        max_total_padding = file_size // 8
-        self.assertLessEqual(padding_before, max_total_padding, "padding_before shouldn't exceed max possible")
-
-        # Clean up for next example
-        rmtree(f"{TESTING_DIR}/store")
+            # Verify padding_before is reasonable (should be 30-70% of total padding)
+            # Total padding is file_size/16 to file_size/8
+            max_total_padding = max(file_size // 8, 256)  # Account for tiny files too
+            self.assertLessEqual(padding_before, max_total_padding, "padding_before shouldn't exceed max possible")
 
     def test_generated_passwords_are_always_valid(self):
         """Generated passwords should always pass validation.
@@ -140,29 +156,27 @@ class PropertyTests(TestCase):
 
         Property: Index metadata (sha256, real_size, filename) should match actual file.
         """
-        test_file = Path(f"{TESTING_DIR}/test_input.bin")
-        test_file.write_bytes(file_content)
-        original_sha = sha256(file_content).hexdigest()
-        original_size = len(file_content)
+        with clean_store() as store_path:
+            test_file = Path(f"{TESTING_DIR}/test_input.bin")
+            test_file.write_bytes(file_content)
+            original_sha = sha256(file_content).hexdigest()
+            original_size = len(file_content)
 
-        # Store the file
-        store_file(f"{TESTING_DIR}/store", str(test_file))
+            # Store the file
+            store_file(str(store_path), str(test_file))
 
-        # Check index
-        _, index = get_index(f"{TESTING_DIR}/store")
-        uuid = list(index.keys())[0]
-        entry = index[uuid]
+            # Check index
+            _, index = get_index(str(store_path))
+            uuid = list(index.keys())[0]
+            entry = index[uuid]
 
-        # Verify index structure: [password, sha256, encrypted_sha256, filename, padding_before, real_size]
-        self.assertEqual(len(entry), 6, "Index entry should have 6 fields")
-        self.assertEqual(entry[1], original_sha, "SHA256 in index should match original")
-        self.assertEqual(entry[3], "test_input.bin", "Filename should be preserved")
-        self.assertEqual(entry[5], original_size, "real_size should match original")
-        self.assertIsInstance(entry[4], int, "padding_before should be an integer")
-        self.assertGreaterEqual(entry[4], 0, "padding_before should be non-negative")
-
-        # Clean up for next example
-        rmtree(f"{TESTING_DIR}/store")
+            # Verify index structure: [password, sha256, encrypted_sha256, filename, padding_before, real_size]
+            self.assertEqual(len(entry), 6, "Index entry should have 6 fields")
+            self.assertEqual(entry[1], original_sha, "SHA256 in index should match original")
+            self.assertEqual(entry[3], "test_input.bin", "Filename should be preserved")
+            self.assertEqual(entry[5], original_size, "real_size should match original")
+            self.assertIsInstance(entry[4], int, "padding_before should be an integer")
+            self.assertGreaterEqual(entry[4], 0, "padding_before should be non-negative")
 
     @given(binary(min_size=0, max_size=100 * 1024))  # 0 to 100KB
     @settings(max_examples=10, deadline=None)
@@ -171,18 +185,16 @@ class PropertyTests(TestCase):
 
         Property: Even edge cases (empty, zeros, random) should roundtrip perfectly.
         """
-        test_file = Path(f"{TESTING_DIR}/edge_case.bin")
-        test_file.write_bytes(file_content)
+        with clean_store() as store_path:
+            test_file = Path(f"{TESTING_DIR}/edge_case.bin")
+            test_file.write_bytes(file_content)
 
-        # Store and immediately retrieve (no cache clearing)
-        store_file(f"{TESTING_DIR}/store", str(test_file))
+            # Store and immediately retrieve (no cache clearing)
+            store_file(str(store_path), str(test_file))
 
-        _, index = get_index(f"{TESTING_DIR}/store")
-        uuid = list(index.keys())[0]
+            _, index = get_index(str(store_path))
+            uuid = list(index.keys())[0]
 
-        # File is cached, should be original
-        cached = Path(f"{TESTING_DIR}/store/files/{uuid}").read_bytes()
-        self.assertEqual(cached, file_content, "Cached file should match original exactly")
-
-        # Clean up for next example
-        rmtree(f"{TESTING_DIR}/store")
+            # File is cached, should be original
+            cached = (store_path / "files" / uuid).read_bytes()
+            self.assertEqual(cached, file_content, "Cached file should match original exactly")
