@@ -7,8 +7,6 @@ WARNING: I don't recommand using this as-is. This a PoC, and usable by me becaus
 - You can use it if you feel that you can edit the code yourself and you can live with my future breaking changes.
 - If you want a production-ready e2e cloud with many features, check https://github.com/Scille/parsec-cloud
 TODOs:
-- add some random length random padding to files before encrypt, just also store actual length in index
-- maybe even add some random length padding before, and also include length of initial padding in index
 - option in the index to make fv automatically rm source on import, or even if and only if the i arg is used
 Possible future improvements:
 - it is possible to actually have a tree of files separated by subparts of the uuid (probably 4 chars each)
