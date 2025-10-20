@@ -3,7 +3,7 @@
 """
 fv - File Vault
 MIT License - Copyright (c) 2024 c4ffein
-WARNING: I don't recommand using this as-is. This a PoC, and usable by me because I know what I want to do with it.
+WARNING: I don't recommand using this as-is - this a PoC, usable by me because I know what I want to do with it
 - You can use it if you feel that you can edit the code yourself and you can live with my future breaking changes.
 - If you want a production-ready e2e cloud with many features, check https://github.com/Scille/parsec-cloud
 TODOs:
@@ -168,7 +168,7 @@ def store_file(store_path, file_path):
         original_content = f.read()
     real_size = len(original_content)
     # Calculate padding: file_size/16 to file_size/8 (6.25% - 12.5%)
-    padding_total = randbelow(real_size >> 4) + (real_size >> 4) if real_size > 0 else randbelow(128) + 128
+    padding_total = randbelow(real_size >> 4) + real_size >> 4 if real_size >= 16 else randbelow(128) + 128
     # Split padding: 30-70% before, rest after
     padding_before_ratio = randbelow(41) + 30  # 30-70%
     padding_before = (padding_total * padding_before_ratio) // 100

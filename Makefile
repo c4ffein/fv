@@ -1,4 +1,4 @@
-.PHONY: help lint lint-check test install-build-system build-package install-package-uploader upload-package-test upload-package
+.PHONY: help lint lint-check test test-hypothesis install-build-system build-package install-package-uploader upload-package-test upload-package
 
 help:  ## Show this help message
 	@echo 'Usage: make [target]'
@@ -12,8 +12,11 @@ lint:  ## Run ruff linter and formatter with auto-fix
 lint-check:  ## Check linting and formatting without making changes
 	ruff check --no-fix && ruff format --check
 
-test:  ## Run tests
-	python3 test.py
+test:  ## Run integration tests (no extra dependencies)
+	python3 -m unittest tests.test_integration -v
+
+test-hypothesis:  ## Run property-based tests (uses uv to install hypothesis temporarily)
+	uv run --with hypothesis --with pytest pytest tests/test_properties.py -v
 
 install-build-system:  ## Install build system dependencies
 	python3 -m pip install --upgrade build

@@ -45,4 +45,4 @@ jobs:
       if: runner.os == 'Windows'
       run: |
         .venv\Scripts\activate
-        python test.py
+        python -m unittest tests.test_integration -v
