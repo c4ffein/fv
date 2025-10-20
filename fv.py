@@ -6,11 +6,14 @@ MIT License - Copyright (c) 2024 c4ffein
 WARNING: I don't recommand using this as-is. This a PoC, and usable by me because I know what I want to do with it.
 - You can use it if you feel that you can edit the code yourself and you can live with my future breaking changes.
 - If you want a production-ready e2e cloud with many features, check https://github.com/Scille/parsec-cloud
-TODOs and possible improvements:
-- make metadata a tree, split letter by letter for the X firsts, then a final dir for the rest, then use existing logic
+TODOs:
 - add some random length random padding to files before encrypt, just also store actual length in index
 - maybe even add some random length padding before, and also include length of initial padding in index
 - option in the index to make fv automatically rm source on import, or even if and only if the i arg is used
+Possible future improvements:
+- it is possible to actually have a tree of files separated by subparts of the uuid (probably 4 chars each)
+  - this would circumvent the slow-down that a massive amount of files on the same level of a dir represent on some fs
+  - doesn't pose problem for now on any of my machines, will implement dynamic sharding if this is the case
 """
 
 from hashlib import sha256 as sha256_hasher
