@@ -1,3 +1,6 @@
+import os
+import sys
+from contextlib import contextmanager
 from hashlib import sha256
 from json import dumps, loads
 from pathlib import Path
@@ -19,6 +22,46 @@ from fv import (
 )
 
 TESTING_DIR = "fv_testing_dir_947f6128-4d75-40bb-a9ad-1a64342bd860"
+
+
+@contextmanager
+def mock_cli_environment(test_home_dir, argv):
+    """Context manager for mocking CLI environment variables and argv.
+
+    Handles:
+    - HOME: Point to test directory for config lookup
+    - GNUPGHOME: Point to real user's .gnupg for GPG agent (macOS compatibility)
+    - PYTHONIOENCODING: Force UTF-8 encoding (Windows compatibility)
+    - sys.argv: Set command-line arguments for CLI testing
+    """
+    # Save original values
+    original_home = os.environ.get("HOME")
+    original_gnupghome = os.environ.get("GNUPGHOME")
+    original_pythonioencoding = os.environ.get("PYTHONIOENCODING")
+    original_argv = sys.argv
+    try:
+        # Set test environment
+        if original_home:
+            os.environ["GNUPGHOME"] = str(Path(original_home) / ".gnupg")
+        os.environ["HOME"] = str(test_home_dir)
+        os.environ["PYTHONIOENCODING"] = "utf-8"
+        sys.argv = argv
+        yield
+    finally:
+        # Restore original values
+        if original_home:
+            os.environ["HOME"] = original_home
+        else:
+            os.environ.pop("HOME", None)
+        if original_gnupghome:
+            os.environ["GNUPGHOME"] = original_gnupghome
+        else:
+            os.environ.pop("GNUPGHOME", None)
+        if original_pythonioencoding:
+            os.environ["PYTHONIOENCODING"] = original_pythonioencoding
+        else:
+            os.environ.pop("PYTHONIOENCODING", None)
+        sys.argv = original_argv
 
 
 class FVTest(TestCase):
@@ -260,9 +303,7 @@ class FVTest(TestCase):
 
     def test_cli_without_rm_flag_keeps_source(self):
         """Test CLI: fv i file.txt (without --rm) should keep source file"""
-        from json import dumps
-
-        # Use absolute paths
+        # Setup test environment
         test_dir_abs = Path(TESTING_DIR).resolve()
         config_dir = test_dir_abs / ".config" / "fv"
         config_dir.mkdir(parents=True)
@@ -271,58 +312,24 @@ class FVTest(TestCase):
         with (config_dir / "init.json").open("w") as f:
             f.write(dumps(config))
 
-        # Create test file
         source_file = test_dir_abs / "test_cli.txt"
         with source_file.open("w") as f:
             f.write("CLI test without --rm")
 
-        self.assertTrue(source_file.exists())
-
         # Run CLI without --rm flag
-        import os
-        import sys
-
-        original_home = os.environ.get("HOME")
-        original_gnupghome = os.environ.get("GNUPGHOME")
-        original_pythonioencoding = os.environ.get("PYTHONIOENCODING")
-        original_argv = sys.argv
-        try:
-            # Set GNUPGHOME to real user's gnupg dir so GPG agent works
-            if original_home:
-                os.environ["GNUPGHOME"] = str(Path(original_home) / ".gnupg")
-            os.environ["HOME"] = str(test_dir_abs)
-            os.environ["PYTHONIOENCODING"] = "utf-8"  # Ensure UTF-8 for Windows
-            sys.argv = ["fv.py", "i", str(source_file)]
-
-            # Import and run main
+        with mock_cli_environment(test_dir_abs, ["fv.py", "i", str(source_file)]):
             from fv import main
 
             main()
 
-            # Source file should still exist
-            self.assertTrue(source_file.exists(), "Source file should NOT be deleted without --rm flag")
-            with source_file.open() as f:
-                self.assertEqual(f.read(), "CLI test without --rm")
-        finally:
-            if original_home:
-                os.environ["HOME"] = original_home
-            else:
-                os.environ.pop("HOME", None)
-            if original_gnupghome:
-                os.environ["GNUPGHOME"] = original_gnupghome
-            else:
-                os.environ.pop("GNUPGHOME", None)
-            if original_pythonioencoding:
-                os.environ["PYTHONIOENCODING"] = original_pythonioencoding
-            else:
-                os.environ.pop("PYTHONIOENCODING", None)
-            sys.argv = original_argv
+        # Source file should still exist
+        self.assertTrue(source_file.exists(), "Source file should NOT be deleted without --rm flag")
+        with source_file.open() as f:
+            self.assertEqual(f.read(), "CLI test without --rm")
 
     def test_cli_with_rm_flag_deletes_source(self):
         """Test CLI: fv i --rm file.txt should delete source file"""
-        from json import dumps
-
-        # Use absolute paths
+        # Setup test environment
         test_dir_abs = Path(TESTING_DIR).resolve()
         config_dir = test_dir_abs / ".config" / "fv"
         config_dir.mkdir(parents=True)
@@ -331,56 +338,22 @@ class FVTest(TestCase):
         with (config_dir / "init.json").open("w") as f:
             f.write(dumps(config))
 
-        # Create test file
         source_file = test_dir_abs / "test_cli_rm.txt"
         with source_file.open("w") as f:
             f.write("CLI test with --rm")
 
-        self.assertTrue(source_file.exists())
-
         # Run CLI with --rm flag
-        import os
-        import sys
-
-        original_home = os.environ.get("HOME")
-        original_gnupghome = os.environ.get("GNUPGHOME")
-        original_pythonioencoding = os.environ.get("PYTHONIOENCODING")
-        original_argv = sys.argv
-        try:
-            # Set GNUPGHOME to real user's gnupg dir so GPG agent works
-            if original_home:
-                os.environ["GNUPGHOME"] = str(Path(original_home) / ".gnupg")
-            os.environ["HOME"] = str(test_dir_abs)
-            os.environ["PYTHONIOENCODING"] = "utf-8"  # Ensure UTF-8 for Windows
-            sys.argv = ["fv.py", "i", "--rm", str(source_file)]
-
-            # Import and run main
+        with mock_cli_environment(test_dir_abs, ["fv.py", "i", "--rm", str(source_file)]):
             from fv import main
 
             main()
 
-            # Source file should be deleted
-            self.assertFalse(source_file.exists(), "Source file should be deleted with --rm flag")
-        finally:
-            if original_home:
-                os.environ["HOME"] = original_home
-            else:
-                os.environ.pop("HOME", None)
-            if original_gnupghome:
-                os.environ["GNUPGHOME"] = original_gnupghome
-            else:
-                os.environ.pop("GNUPGHOME", None)
-            if original_pythonioencoding:
-                os.environ["PYTHONIOENCODING"] = original_pythonioencoding
-            else:
-                os.environ.pop("PYTHONIOENCODING", None)
-            sys.argv = original_argv
+        # Source file should be deleted
+        self.assertFalse(source_file.exists(), "Source file should be deleted with --rm flag")
 
     def test_cli_autodetect_without_rm_keeps_source(self):
         """Test CLI: fv file.txt (autodetect mode without --rm) should keep source file"""
-        from json import dumps
-
-        # Use absolute paths
+        # Setup test environment
         test_dir_abs = Path(TESTING_DIR).resolve()
         config_dir = test_dir_abs / ".config" / "fv"
         config_dir.mkdir(parents=True)
@@ -389,52 +362,20 @@ class FVTest(TestCase):
         with (config_dir / "init.json").open("w") as f:
             f.write(dumps(config))
 
-        # Create test file
         source_file = test_dir_abs / "test_autodetect.txt"
         with source_file.open("w") as f:
             f.write("Autodetect test without --rm")
 
-        self.assertTrue(source_file.exists())
-
         # Run CLI in autodetect mode without --rm
-        import os
-        import sys
-
-        original_home = os.environ.get("HOME")
-        original_gnupghome = os.environ.get("GNUPGHOME")
-        original_pythonioencoding = os.environ.get("PYTHONIOENCODING")
-        original_argv = sys.argv
-        try:
-            # Set GNUPGHOME to real user's gnupg dir so GPG agent works
-            if original_home:
-                os.environ["GNUPGHOME"] = str(Path(original_home) / ".gnupg")
-            os.environ["HOME"] = str(test_dir_abs)
-            os.environ["PYTHONIOENCODING"] = "utf-8"  # Ensure UTF-8 for Windows
-            sys.argv = ["fv.py", str(source_file)]
-
-            # Import and run main
+        with mock_cli_environment(test_dir_abs, ["fv.py", str(source_file)]):
             from fv import main
 
             main()
 
-            # Source file should still exist
-            self.assertTrue(source_file.exists(), "Source file should NOT be deleted without --rm flag")
-            with source_file.open() as f:
-                self.assertEqual(f.read(), "Autodetect test without --rm")
-        finally:
-            if original_home:
-                os.environ["HOME"] = original_home
-            else:
-                os.environ.pop("HOME", None)
-            if original_gnupghome:
-                os.environ["GNUPGHOME"] = original_gnupghome
-            else:
-                os.environ.pop("GNUPGHOME", None)
-            if original_pythonioencoding:
-                os.environ["PYTHONIOENCODING"] = original_pythonioencoding
-            else:
-                os.environ.pop("PYTHONIOENCODING", None)
-            sys.argv = original_argv
+        # Source file should still exist
+        self.assertTrue(source_file.exists(), "Source file should NOT be deleted without --rm flag")
+        with source_file.open() as f:
+            self.assertEqual(f.read(), "Autodetect test without --rm")
 
 
 if __name__ == "__main__":
