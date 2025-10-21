@@ -252,6 +252,7 @@ def main():
     try:
         # Respect HOME environment variable for testing, otherwise use Path.home()
         import os
+
         home_dir = Path(os.environ["HOME"]) if "HOME" in os.environ else Path.home()
         with (home_dir / ".config" / "fv" / "init.json").open() as f:
             config = loads(f.read())
