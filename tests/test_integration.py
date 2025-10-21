@@ -284,12 +284,14 @@ class FVTest(TestCase):
 
         original_home = os.environ.get("HOME")
         original_gnupghome = os.environ.get("GNUPGHOME")
+        original_pythonioencoding = os.environ.get("PYTHONIOENCODING")
         original_argv = sys.argv
         try:
             # Set GNUPGHOME to real user's gnupg dir so GPG agent works
             if original_home:
                 os.environ["GNUPGHOME"] = str(Path(original_home) / ".gnupg")
             os.environ["HOME"] = str(test_dir_abs)
+            os.environ["PYTHONIOENCODING"] = "utf-8"  # Ensure UTF-8 for Windows
             sys.argv = ["fv.py", "i", str(source_file)]
 
             # Import and run main
@@ -310,6 +312,10 @@ class FVTest(TestCase):
                 os.environ["GNUPGHOME"] = original_gnupghome
             else:
                 os.environ.pop("GNUPGHOME", None)
+            if original_pythonioencoding:
+                os.environ["PYTHONIOENCODING"] = original_pythonioencoding
+            else:
+                os.environ.pop("PYTHONIOENCODING", None)
             sys.argv = original_argv
 
     def test_cli_with_rm_flag_deletes_source(self):
@@ -338,12 +344,14 @@ class FVTest(TestCase):
 
         original_home = os.environ.get("HOME")
         original_gnupghome = os.environ.get("GNUPGHOME")
+        original_pythonioencoding = os.environ.get("PYTHONIOENCODING")
         original_argv = sys.argv
         try:
             # Set GNUPGHOME to real user's gnupg dir so GPG agent works
             if original_home:
                 os.environ["GNUPGHOME"] = str(Path(original_home) / ".gnupg")
             os.environ["HOME"] = str(test_dir_abs)
+            os.environ["PYTHONIOENCODING"] = "utf-8"  # Ensure UTF-8 for Windows
             sys.argv = ["fv.py", "i", "--rm", str(source_file)]
 
             # Import and run main
@@ -362,6 +370,10 @@ class FVTest(TestCase):
                 os.environ["GNUPGHOME"] = original_gnupghome
             else:
                 os.environ.pop("GNUPGHOME", None)
+            if original_pythonioencoding:
+                os.environ["PYTHONIOENCODING"] = original_pythonioencoding
+            else:
+                os.environ.pop("PYTHONIOENCODING", None)
             sys.argv = original_argv
 
     def test_cli_autodetect_without_rm_keeps_source(self):
@@ -390,12 +402,14 @@ class FVTest(TestCase):
 
         original_home = os.environ.get("HOME")
         original_gnupghome = os.environ.get("GNUPGHOME")
+        original_pythonioencoding = os.environ.get("PYTHONIOENCODING")
         original_argv = sys.argv
         try:
             # Set GNUPGHOME to real user's gnupg dir so GPG agent works
             if original_home:
                 os.environ["GNUPGHOME"] = str(Path(original_home) / ".gnupg")
             os.environ["HOME"] = str(test_dir_abs)
+            os.environ["PYTHONIOENCODING"] = "utf-8"  # Ensure UTF-8 for Windows
             sys.argv = ["fv.py", str(source_file)]
 
             # Import and run main
@@ -416,6 +430,10 @@ class FVTest(TestCase):
                 os.environ["GNUPGHOME"] = original_gnupghome
             else:
                 os.environ.pop("GNUPGHOME", None)
+            if original_pythonioencoding:
+                os.environ["PYTHONIOENCODING"] = original_pythonioencoding
+            else:
+                os.environ.pop("PYTHONIOENCODING", None)
             sys.argv = original_argv
 
 

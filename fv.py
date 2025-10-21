@@ -250,7 +250,10 @@ def usage(wrong_config=False, wrong_command=False, wrong_arg_len=False):
 
 def main():
     try:
-        with (Path.home() / ".config" / "fv" / "init.json").open() as f:
+        # Respect HOME environment variable for testing, otherwise use Path.home()
+        import os
+        home_dir = Path(os.environ["HOME"]) if "HOME" in os.environ else Path.home()
+        with (home_dir / ".config" / "fv" / "init.json").open() as f:
             config = loads(f.read())
         store_path = config["stores"]["default"]["path"]
     except Exception:
